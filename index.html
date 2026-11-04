@@ -497,7 +497,7 @@ function mostrarTelaRegras(){
    Criação: novembro/2026 (mês 1).
    ============================================================ */
 const APP_CRIACAO = { mes: 11, ano: 2026 };
-const APP_ALTERACAO = 0;
+const APP_ALTERACAO = 1;
 const APP_DATA = '2026-11-04';
 function appVersao(){
   const p = APP_DATA.split('-').map(Number);
@@ -1834,10 +1834,14 @@ function intervaloPeriodo(){
     default: return [ini(1), fim(12)];
   }
 }
-const AGRUPAMENTOS = { recurso:'Recurso / ficha', area:'Área / bloco', fonte:'Fonte', credor:'Credor', contrato:'Contrato', natureza:'Natureza', mes:'Mês' };
+const AGRUPAMENTOS = { recurso:'Recurso / ficha', ficha:'Nº da ficha', componente:'Componente', area:'Área / bloco', fonte:'Fonte', credor:'Credor', contrato:'Contrato', natureza:'Natureza', mes:'Mês' };
+/* "Nº da ficha" junta todos os recursos da mesma ficha (ex.: as 4 linhas da F-424);
+   "Componente" junta pelo convênio/emenda/programa, independentemente da ficha. */
 function chaveGrupo(m){
   const r = getRecurso(m.recursoId);
   switch(per.agrupar){
+    case 'ficha': return r ? (r.ficha || 'Sem nº de ficha') : 'Sem recurso';
+    case 'componente': return r ? (r.componente || r.programa || r.descricao || 'Sem componente') : 'Sem recurso';
     case 'area': return r ? (r.area||'Sem área') : 'Sem recurso';
     case 'fonte': return m.fonte || (r && r.fonte) || 'Sem fonte';
     case 'credor': return m.credor || m.modeloRotulo || 'Sem credor';
@@ -1881,7 +1885,8 @@ function dadosPeriodo(){
 }
 function viewPeriodo(){
   const d = dadosPeriodo();
-  const chaves = Object.keys(d.grupos).sort((a,b)=> per.agrupar==='mes' ? a.localeCompare(b) : d.grupos[b].ordenado - d.grupos[a].ordenado);
+  const ordemMes = k=>{ const p = String(k).split('/'); return (p[1]||'')+pad2(MESES_ABREV.indexOf(p[0])+1); };
+  const chaves = Object.keys(d.grupos).sort((a,b)=> per.agrupar==='mes' ? ordemMes(a).localeCompare(ordemMes(b)) : per.agrupar==='ficha' ? a.localeCompare(b, 'pt-BR', {numeric:true}) : (d.grupos[b].ordenado - d.grupos[a].ordenado) || a.localeCompare(b, 'pt-BR'));
   const tot = chaves.reduce((s,k)=>{ const o = d.grupos[k]; return { entradas:s.entradas+o.entradas, empenhado:s.empenhado+o.empenhado, ordenado:s.ordenado+o.ordenado, pago:s.pago+o.pago, qtd:s.qtd+o.qtd }; }, {entradas:0, empenhado:0, ordenado:0, pago:0, qtd:0});
   const mk = Object.keys(d.meses).sort();
   const maxM = Math.max(1, ...mk.map(k=>Math.max(d.meses[k].ordenado, d.meses[k].empenhado, d.meses[k].pago)));

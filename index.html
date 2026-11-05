@@ -166,7 +166,8 @@ td.nowrap{white-space:nowrap;}
 .rn-tab .rn-v{text-align:right;white-space:nowrap;}
 .rn-tab tfoot td{font-weight:800;}
 .rn-obs{font-size:11px;margin-top:6px;}
-.rn-ass{margin-top:26px;font-size:13px;}
+.rn-dep{font-size:14px;margin:-6px 0 12px;}
+.rn-ass{margin-top:22px;font-size:13px;}
 .rn-rec{display:flex;justify-content:space-between;gap:20px;}
 
 .toast{position:fixed;bottom:34px;right:22px;background:var(--teal-dark);color:#fff;padding:13px 20px;border-radius:10px;font-size:13px;box-shadow:0 8px 30px rgba(0,0,0,.2);z-index:500;opacity:0;transform:translateY(12px) scale(.97);transition:all .3s cubic-bezier(.175,.885,.32,1.1);pointer-events:none;max-width:440px;line-height:1.4;}
@@ -248,6 +249,8 @@ code.rule{display:block;white-space:pre;font-size:11.5px;background:#0F2A38;colo
 .app-footer{position:fixed;left:0;right:0;bottom:0;z-index:80;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:5px 16px;background:var(--teal-dark);color:rgba(255,255,255,.72);font-size:11px;white-space:nowrap;overflow-x:auto;}
 .app-footer b{color:rgba(255,255,255,.92);font-weight:600;}
 body.com-rodape main{padding-bottom:74px;}
+/* tela de acesso no mesmo verde-petróleo do Cotação de Preços e do Controle de Exames */
+#loginScreen{--teal:#0E6E6E;--teal-dark:#0A4F4F;--teal-soft:#E3F2F1;}
 .login-versao{position:absolute;left:0;right:0;bottom:18px;text-align:center;font-size:11px;color:rgba(255,255,255,.6);}
 .btn-fechar-app{position:absolute;top:10px;right:12px;width:28px;height:28px;border:none;border-radius:8px;background:transparent;color:var(--ink-soft);font-size:17px;font-weight:700;cursor:pointer;}
 .btn-fechar-app:hover{background:var(--red-soft);color:var(--red);}
@@ -286,15 +289,15 @@ body.com-rodape main{padding-bottom:74px;}
   </div>
 </div>
 
-<div id="loginScreen" style="display:none;position:fixed;inset:0;background:linear-gradient(135deg,#0A3347 0%,var(--teal-dark) 40%,#135675 70%,var(--teal) 100%);z-index:260;align-items:center;justify-content:center;padding:20px;">
+<div id="loginScreen" style="display:none;position:fixed;inset:0;background:linear-gradient(135deg,#083e3e 0%,var(--teal-dark) 40%,#0C5A5A 70%,var(--teal) 100%);z-index:260;align-items:center;justify-content:center;padding:20px;">
   <div class="card" style="max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25);border:none;position:relative;">
-    <button type="button" class="btn-fechar-app" onclick="fecharAplicativo()" title="Fechar o aplicativo">✕</button>
+    <button type="button" class="btn-fechar-app" onclick="fecharAplicativo()" title="Fechar o aplicativo" aria-label="Fechar o aplicativo">✕</button>
     <div style="text-align:center;margin-bottom:16px;">
       <div style="width:56px;height:56px;border-radius:14px;background:var(--teal-soft);display:inline-flex;align-items:center;justify-content:center;font-size:28px;margin-bottom:10px;">🧾</div>
       <h2 style="margin:0 0 4px;">Acesso ao sistema</h2>
       <div style="font-size:11px;color:var(--ink-soft);font-weight:600;letter-spacing:.03em;">ORDENAMENTO DE DESPESAS — NOTAS E EMPENHOS</div>
     </div>
-    <div class="subtitle" style="text-align:center;" id="loginEntidadeSub">Secretaria Municipal de Saúde</div>
+    <div class="subtitle" style="text-align:center;" id="loginEntidadeSub">Prefeitura Municipal de Jaborandi</div>
     <div class="field" style="margin-bottom:12px;">
       <label>Usuário</label>
       <input type="text" id="loginUsuario" placeholder="Ex.: joao" autocomplete="username" onkeydown="if(event.key==='Enter'){document.getElementById('loginSenha').focus();}">
@@ -303,12 +306,13 @@ body.com-rodape main{padding-bottom:74px;}
       <label>Senha</label>
       <div style="position:relative;">
         <input type="password" id="loginSenha" placeholder="Digite sua senha" autocomplete="current-password" style="width:100%;padding-right:38px;" onkeydown="if(event.key==='Enter'){event.preventDefault();submitLogin();}">
-        <button type="button" onclick="toggleLoginSenhaVisivel()" title="Mostrar/ocultar senha" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;padding:4px 6px;">👁️</button>
+        <button type="button" onclick="toggleLoginSenhaVisivel()" title="Mostrar/ocultar senha" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;padding:4px 6px;line-height:1;">👁️</button>
       </div>
     </div>
     <div id="loginErro" style="color:var(--red);font-size:12px;min-height:16px;margin-bottom:8px;"></div>
     <button class="btn" style="width:100%;justify-content:center;" onclick="submitLogin()">Entrar</button>
-    <div class="muted" style="font-size:11.5px;margin-top:10px;">Cada usuário tem acesso individual. O administrador cadastra novos usuários em Administração → Usuários.</div>
+    <div style="text-align:center;margin-top:10px;"><a href="#" onclick="esqueciMinhaSenha();return false;" style="font-size:12px;">Esqueci minha senha</a></div>
+    <div class="muted" style="font-size:11.5px;margin-top:10px;">Cada usuário tem acesso individual. O administrador do sistema pode cadastrar novos usuários no módulo "Usuários".</div>
   </div>
   <div class="login-versao" id="loginVersao"></div>
 </div>
@@ -509,7 +513,7 @@ function mostrarTelaRegras(){
    Criação: novembro/2026 (mês 1).
    ============================================================ */
 const APP_CRIACAO = { mes: 11, ano: 2026 };
-const APP_ALTERACAO = 2;
+const APP_ALTERACAO = 3;
 const APP_DATA = '2026-11-05';
 function appVersao(){
   const p = APP_DATA.split('-').map(Number);
@@ -604,6 +608,34 @@ function saveUsersState(imediato){
   if(imediato) doSave(); else usersSaveTimer = setTimeout(doSave, 600);
 }
 function toggleLoginSenhaVisivel(){ const i = document.getElementById('loginSenha'); if(i) i.type = i.type==='password' ? 'text' : 'password'; }
+/* "Esqueci minha senha" — mesmo fluxo do Cotação de Preços: registra o pedido (aparece em Administração → Usuários)
+   e abre o e-mail para os administradores que têm e-mail cadastrado. A senha antiga não pode ser recuperada (só o hash é guardado). */
+function esqueciMinhaSenha(){
+  const usuarioInput = prompt('Informe o seu usuário (login) para solicitar uma nova senha ao administrador:');
+  if(!usuarioInput) return;
+  const usuario = usuarioInput.trim().toLowerCase();
+  const u = USERS_STATE.usuarios.find(x=>x.usuario===usuario);
+  if(!u){ showToast('Usuário não encontrado.','warning'); return; }
+  const pedido = { id: uid(), usuario: u.usuario, nome: u.nome || u.usuario, perfil: perfilLabel(u.perfil), dataHora: new Date().toLocaleString('pt-BR') };
+  if(!Array.isArray(USERS_STATE.solicitacoesSenha)) USERS_STATE.solicitacoesSenha = [];
+  USERS_STATE.solicitacoesSenha.push(pedido);
+  saveUsersState(true);
+  const emailsAdmins = USERS_STATE.usuarios.filter(x=>x.perfil==='master' && x.email).map(x=>x.email);
+  if(!emailsAdmins.length){ showToast('Pedido registrado no sistema, mas nenhum e-mail de administrador está cadastrado ainda (módulo Usuários) para receber o aviso por e-mail.','warning'); return; }
+  const assunto = encodeURIComponent('Solicitação de nova senha — Ordenamento de Despesas');
+  const corpo = encodeURIComponent(
+    `Um usuário solicitou uma nova senha de acesso ao sistema de Ordenamento de Despesas.\n\n`+
+    `Usuário (login): ${pedido.usuario}\nNome completo: ${pedido.nome}\nPerfil: ${pedido.perfil}\nData/hora do pedido: ${pedido.dataHora}\n\n`+
+    `Por segurança, a senha anterior não pode ser recuperada (o sistema guarda apenas um código de verificação da senha, não a senha em si). `+
+    `Cadastre uma senha NOVA para este usuário no módulo Usuários e informe a ele.`);
+  window.location.href = `mailto:${emailsAdmins.join(',')}?subject=${assunto}&body=${corpo}`;
+  showToast('Pedido registrado. Abrindo seu programa de e-mail para enviar ao administrador...','success');
+}
+function removerSolicitacaoSenha(id){
+  if(!Array.isArray(USERS_STATE.solicitacoesSenha)) return;
+  USERS_STATE.solicitacoesSenha = USERS_STATE.solicitacoesSenha.filter(s=>s.id!==id);
+  saveUsersState(true); render();
+}
 function lerTentativas(){ try{ return JSON.parse(localStorage.getItem(LOCAL_PREFIXO+'tentativas')||'{}'); }catch(e){ return {}; } }
 function gravarTentativas(o){ try{ localStorage.setItem(LOCAL_PREFIXO+'tentativas', JSON.stringify(o)); }catch(e){} }
 async function submitLogin(){
@@ -2060,6 +2092,7 @@ function relNotasDocHTML(itens){
   return `<div class="rn-doc">
     <div class="rn-tit"><span>${esc(relNotasTitulo())}</span><span>NOTAS FISCAIS</span></div>
     <div class="rn-sub">${carimbo}${relNotas.de||relNotas.ate?` &nbsp;·&nbsp; Emissão de ${relNotas.de?fmtDateBR(relNotas.de):'…'} a ${relNotas.ate?fmtDateBR(relNotas.ate):'…'}`:''}</div>
+    <div class="rn-dep"><b>ENCAMINHAR PARA:</b> ${relNotas.departamento?"<b>DEPARTAMENTO DE "+esc(relNotas.departamento.toUpperCase())+"</b>":"______________________________"}</div>
     <table class="rn-tab"><thead><tr><th style="width:17%">NF Nº</th><th style="width:16%">DATA DE EMISSÃO</th><th>FORNECEDOR</th><th style="width:19%">VALOR</th></tr></thead>
     <tbody>${itens.map(x=>`<tr><td>${esc(x.n.nf||'')}</td><td>${x.d?fmtDateBR(x.d):''}${x.n.emissao?'':'*'}</td><td>${esc((x.n.credor||x.n.modeloRotulo||'').toUpperCase())}</td><td class="rn-v">${fmtMoney(x.n.valor)}</td></tr>`).join('') || '<tr><td colspan="4" style="text-align:center;">Nenhuma nota no período.</td></tr>'}</tbody>
     <tfoot><tr><td colspan="3">TOTAL — ${itens.length} nota(s)</td><td class="rn-v">${fmtMoney(total)}</td></tr></tfoot></table>
@@ -2074,11 +2107,11 @@ function viewRelacaoNotas(){
   const deptos = lista('departamentos');
   return `<div class="card no-print">
     <h2>📋 Relação de notas ordenadas</h2>
-    <div class="subtitle">Lista as notas ordenadas pela <b>data de emissão</b> dentro do período, para enviar a outro departamento. “Conferido” sai com o nome de quem está logado. Os departamentos são cadastrados em Cadastros → Listas de opções.</div>
+    <div class="subtitle">Lista as notas ordenadas pela <b>data de emissão</b> dentro do período, para enviar ao departamento escolhido em “Enviar para”. “Conferido” sai com o nome de quem está logado. Os departamentos são cadastrados em Cadastros → Listas de opções.</div>
     <div class="filtros" style="margin-top:10px;">
       <div class="field"><label>Período inicial (emissão)</label><input type="date" value="${esc(R.de)}" onchange="relNotas.de=this.value;render()"></div>
       <div class="field"><label>Período final (emissão)</label><input type="date" value="${esc(R.ate)}" onchange="relNotas.ate=this.value;render()"></div>
-      <div class="field"><label>Departamento</label><select onchange="relNotas.departamento=this.value;try{localStorage.setItem(LOCAL_PREFIXO+'relDepto',this.value)}catch(e){};render()"><option value="">—</option>${deptos.map(d=>`<option ${R.departamento===d?'selected':''}>${esc(d)}</option>`).join('')}${R.departamento&&!deptos.includes(R.departamento)?`<option selected>${esc(R.departamento)}</option>`:''}</select></div>
+      <div class="field"><label>Enviar para (departamento)</label><select onchange="relNotas.departamento=this.value;try{localStorage.setItem(LOCAL_PREFIXO+'relDepto',this.value)}catch(e){};render()"><option value="">—</option>${deptos.map(d=>`<option ${R.departamento===d?'selected':''}>${esc(d)}</option>`).join('')}${R.departamento&&!deptos.includes(R.departamento)?`<option selected>${esc(R.departamento)}</option>`:''}</select></div>
       <div class="field"><label>Área</label><select onchange="relNotas.area=this.value;render()"><option value="">Todas</option>${lista('areas').map(a=>`<option ${R.area===a?'selected':''}>${esc(a)}</option>`).join('')}</select></div>
       <div class="field"><label>Situação</label><select onchange="relNotas.situacao=this.value;render()"><option value="">Todas (menos canceladas)</option>${SITUACOES.filter(s=>s.k!=='cancelada').map(s=>`<option value="${s.k}" ${R.situacao===s.k?'selected':''}>${s.n}</option>`).join('')}</select></div>
       <div class="field"><label>Conferido</label><input value="${esc(relNotasConferente())}" disabled></div>
@@ -2106,7 +2139,7 @@ function exportarRelacaoNotasExcel(){
   if(!window.XLSX){ showToast('A biblioteca do Excel não carregou.','error'); return; }
   const R = relNotasEstado(), itens = relNotasLista().filter(x=>!R.fora[x.n.id]);
   const agora = new Date();
-  const aoa = [[relNotasTitulo(),'','','NOTAS FISCAIS'], [agora.toLocaleDateString('pt-BR')+' '+pad2(agora.getHours())+':'+pad2(agora.getMinutes())], [], ['NF Nº','DATA DE EMISSÃO','FORNECEDOR','VALOR']];
+  const aoa = [[relNotasTitulo(),'','','NOTAS FISCAIS'], [agora.toLocaleDateString('pt-BR')+' '+pad2(agora.getHours())+':'+pad2(agora.getMinutes())], ['ENCAMINHAR PARA: '+(R.departamento?'DEPARTAMENTO DE '+R.departamento.toUpperCase():'')], [], ['NF Nº','DATA DE EMISSÃO','FORNECEDOR','VALOR']];
   itens.forEach(x=>aoa.push([x.n.nf||'', x.d?fmtDateBR(x.d):'', (x.n.credor||x.n.modeloRotulo||'').toUpperCase(), Number(x.n.valor)||0]));
   aoa.push(['TOTAL','',itens.length+' nota(s)', r2(itens.reduce((s,x)=>s+(Number(x.n.valor)||0),0))], [], ['CONFERIDO: '+relNotasConferente()], [], ['RECEBIDO:','','','DATA:']);
   const ws = XLSX.utils.aoa_to_sheet(aoa);
@@ -2533,6 +2566,11 @@ function viewUsuarios(){
     <div class="table-wrap" style="margin-top:10px;"><table><thead><tr><th>Usuário</th><th>Nome</th><th>Perfil</th><th>Situação</th><th></th></tr></thead>
     <tbody>${USERS_STATE.usuarios.map(u=>`<tr><td><b>${esc(u.usuario)}</b></td><td>${esc(u.nome||'')}</td><td>${perfilLabel(u.perfil)}</td><td>${u.bloqueado?'<span class="badge inativo">bloqueado</span>':u.ativo===false?'<span class="badge neutro">inativo</span>':'<span class="badge ok">ativo</span>'}</td>
       <td class="nowrap"><button class="btn ghost small" onclick="usuarioEditId='${u.id}';render()">✏️</button>${u.bloqueado?`<button class="btn ghost small" onclick="desbloquearUsuario('${u.id}')">🔓 desbloquear</button>`:''}</td></tr>`).join('')}</tbody></table></div></div>
+  ${(USERS_STATE.solicitacoesSenha||[]).length?`<div class="card"><h2>🔑 Pedidos de nova senha</h2>
+    <div class="subtitle">Feitos pelo link “Esqueci minha senha” da tela de acesso. Cadastre uma senha nova para o usuário (✏️ acima) e depois marque o pedido como atendido.</div>
+    <div class="table-wrap"><table><thead><tr><th>Data/hora</th><th>Usuário</th><th>Nome</th><th>Perfil</th><th></th></tr></thead>
+    <tbody>${USERS_STATE.solicitacoesSenha.slice().reverse().map(s=>`<tr><td class="nowrap">${esc(s.dataHora)}</td><td><b>${esc(s.usuario)}</b></td><td>${esc(s.nome)}</td><td>${esc(s.perfil)}</td>
+      <td class="nowrap"><button class="btn ghost small" onclick="const u=USERS_STATE.usuarios.find(x=>x.usuario==='${escJs(s.usuario)}');if(u){usuarioEditId=u.id;render();}">✏️ Nova senha</button><button class="btn ghost small" onclick="removerSolicitacaoSenha('${s.id}')">✔ Atendido</button></td></tr>`).join('')}</tbody></table></div></div>`:''}
   <div class="card"><h2>🕑 Registro de acessos (últimas 150 sessões)</h2>
     <div class="table-wrap"><table><thead><tr><th>Data</th><th>Início</th><th>Fim</th><th>Usuário</th><th>Ações</th></tr></thead>
     <tbody>${logs.map(l=>`<tr><td class="nowrap">${esc(l.data)}</td><td>${esc(l.horaInicio)}</td><td>${esc(l.horaFinal||'')}</td><td>${esc(l.nomeUsuario||l.usuario)}</td><td class="small-txt" style="white-space:normal;">${(l.comandos||[]).filter(c=>c.startsWith('✎')).map(esc).join('<br>')||'—'}</td></tr>`).join('')}</tbody></table></div></div>`;

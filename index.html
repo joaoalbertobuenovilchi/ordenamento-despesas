@@ -156,6 +156,18 @@ td.nowrap{white-space:nowrap;}
 .tabs{display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid var(--line);flex-wrap:wrap;}
 .tab{padding:9px 16px;font-size:12.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;border-bottom:2px solid transparent;}
 .tab.active{color:var(--teal-dark);border-bottom-color:var(--teal);}
+.rn-doc{background:#fff;color:#000;font-family:Calibri,Arial,sans-serif;max-width:760px;margin:0 auto;padding:6px 4px;}
+.rn-tit{display:flex;justify-content:space-between;gap:16px;font-size:17px;font-weight:800;}
+.rn-sub{font-weight:700;font-size:12.5px;margin:4px 0 14px;}
+.rn-tab{width:100%;border-collapse:collapse;font-size:12.5px;}
+.rn-tab th,.rn-tab td{border:1px solid #000;padding:4px 6px;color:#000;white-space:normal;font-weight:700;}
+.rn-tab th{background:#fff !important;text-align:center;position:static !important;}
+.rn-tab td:nth-child(1),.rn-tab td:nth-child(2){text-align:center;}
+.rn-tab .rn-v{text-align:right;white-space:nowrap;}
+.rn-tab tfoot td{font-weight:800;}
+.rn-obs{font-size:11px;margin-top:6px;}
+.rn-ass{margin-top:26px;font-size:13px;}
+.rn-rec{display:flex;justify-content:space-between;gap:20px;}
 
 .toast{position:fixed;bottom:34px;right:22px;background:var(--teal-dark);color:#fff;padding:13px 20px;border-radius:10px;font-size:13px;box-shadow:0 8px 30px rgba(0,0,0,.2);z-index:500;opacity:0;transform:translateY(12px) scale(.97);transition:all .3s cubic-bezier(.175,.885,.32,1.1);pointer-events:none;max-width:440px;line-height:1.4;}
 .toast.show{opacity:1;transform:translateY(0) scale(1);}
@@ -497,8 +509,8 @@ function mostrarTelaRegras(){
    Criação: novembro/2026 (mês 1).
    ============================================================ */
 const APP_CRIACAO = { mes: 11, ano: 2026 };
-const APP_ALTERACAO = 1;
-const APP_DATA = '2026-11-04';
+const APP_ALTERACAO = 2;
+const APP_DATA = '2026-11-05';
 function appVersao(){
   const p = APP_DATA.split('-').map(Number);
   const seqMes = (p[0] - APP_CRIACAO.ano)*12 + (p[1] - APP_CRIACAO.mes) + 1;
@@ -892,6 +904,7 @@ const LISTAS_PADRAO = {
   elementos: ['Material de Consumo','Prestação de Serviços de Terceiros Pessoa Jurídica','Outros Serviços de Terceiros Pessoa Física','Distribuição Gratuita','Material Permanente / Investimento','Obras e Instalações'],
   tiposEmpenho: ['Ordinário','Estimativo','Global'],
   tiposContrato: ['Contrato','ATA','Termo de Credenciamento','Aditamento'],
+  departamentos: ['Compras','Contabilidade','Tesouraria','Empenhos','Almoxarifado','Licitações'],
   textosItem2: [
     'Favor manter esse anexo junto com a Ordem de Compra /Nota Fiscal remetendo-os para o setor de empenhos da Prefeitura Municipal de Jaborandi',
     'Este Carimbo Ordenador tem a finalidade EXCLUSIVAMENTE de indicar a fonte de Despesa na qual a presente Nota Fiscal deverá ser empenhada/liquidada e quitada. A conferência e a execução do instrumento contratual, é realizada por outro servidor, conforme atestado no Espelho de Ponto em Anexo e no Verso da Nota Fiscal.'
@@ -900,7 +913,7 @@ const LISTAS_PADRAO = {
 const ROTULOS_LISTAS = {
   modalidades:'Linhas de modalidade do carimbo (rótulos)', tiposCompra:'Modalidades de compra/licitação', niveis:'Níveis de atenção à saúde',
   unidades:'Unidades de destino', naturezas:'Natureza (material / serviço)', fontes:'Fontes de recursos', transferencias:'Tipos de transferência',
-  areas:'Áreas / blocos do ordenamento', elementos:'Elementos de despesa', tiposEmpenho:'Tipos de empenho', tiposContrato:'Tipos de contrato', textosItem2:'Textos do ITEM 2'
+  areas:'Áreas / blocos do ordenamento', elementos:'Elementos de despesa', tiposEmpenho:'Tipos de empenho', tiposContrato:'Tipos de contrato', departamentos:'Departamentos (relação de notas ordenadas)', textosItem2:'Textos do ITEM 2'
 };
 const SITUACOES = [
   {k:'ordenada', n:'Ordenada'}, {k:'empenhada', n:'Empenhada'}, {k:'liquidada', n:'Liquidada'}, {k:'paga', n:'Paga'}, {k:'cancelada', n:'Cancelada'}
@@ -1657,9 +1670,23 @@ function exportarEmpenhosExcel(){
 let filtroRecursos = { area:'', busca:'', inativos:false };
 let recursoAbertoId = null, recursoEditId = null;
 function abrirRecurso(id){ recursoAbertoId = id; recursoEditId = null; currentView = 'recursos'; render(); window.scrollTo(0,0); }
+let abaRecursos = 'saldos';
+function abasRecursosHTML(){
+  const abas = [['saldos','💰 Recursos e saldos'],['atualizacao','📥 Atualização de recursos'],['relacao','📋 Relação de notas ordenadas']];
+  return `<div class="tabs">${abas.map(a=>`<div class="tab ${abaRecursos===a[0]?'active':''}" onclick="abaRecursos='${a[0]}';render()">${a[1]}</div>`).join('')}</div>`;
+}
 function viewRecursos(){
   if(recursoEditId) return formRecursoHTML();
   if(recursoAbertoId && getRecurso(recursoAbertoId)) return extratoRecursoHTML(getRecurso(recursoAbertoId));
+  if(abaRecursos==='atualizacao') return abasRecursosHTML() + viewAtualizacaoRecursos();
+  if(abaRecursos==='relacao') return abasRecursosHTML() + viewRelacaoNotas();
+  return abasRecursosHTML() + viewRecursosSaldos();
+}
+function balancetePeqHTML(r){
+  const b = r.balancete; if(!b) return '<span class="small-txt muted">—</span>';
+  return `<div title="Balancete ${esc(b.periodo||'')} — importado em ${esc(b.importadoEm?fmtDateBR(b.importadoEm.slice(0,10)):'')}"><div class="small-txt">dot. ${fmtNumBR(b.dotacao)}</div><div class="small-txt">emp. ${fmtNumBR(b.empenhado)}</div><b class="${b.saldoDotacao<0?'neg':''}">${fmtMoney(b.saldoDotacao)}</b></div>`;
+}
+function viewRecursosSaldos(){
   const termo = normTxt(filtroRecursos.busca);
   const recs = recursosDoExercicio().filter(r=>filtroRecursos.inativos || r.ativo!==false)
     .filter(r=>!filtroRecursos.area || r.area===filtroRecursos.area)
@@ -1673,16 +1700,17 @@ function viewRecursos(){
     Object.keys(totG).forEach(k=>totG[k]+=t[k]);
     return `<div class="card"><div class="flexrow"><h2>${esc(a)}</h2><span class="small-txt">${linhas.length} recurso(s) · saldo <b class="${t.saldo<0?'neg':''}">${fmtMoney(t.saldo)}</b></span></div>
       <div class="table-wrap" style="margin-top:8px;"><table>
-        <thead><tr><th>Ficha</th><th>Recurso / componente</th><th>Fonte</th><th>Elemento</th><th class="num">Saldo inicial</th><th class="num">Entradas</th><th class="num">Ordenado</th><th class="num">Saldo</th><th class="num" title="Saldo menos o que está reservado em empenhos">Livre p/ empenhar</th><th>Uso</th><th></th></tr></thead>
+        <thead><tr><th>Ficha</th><th>Recurso / componente</th><th>Fonte</th><th>Elemento</th><th class="num">Saldo inicial</th><th class="num">Entradas</th><th class="num">Ordenado</th><th class="num">Saldo</th><th class="num" title="Saldo menos o que está reservado em empenhos">Livre p/ empenhar</th><th class="num" title="Último balancete importado: dotação atual, empenhado e saldo da dotação">Balancete</th><th>Uso</th><th></th></tr></thead>
         <tbody>${linhas.map(x=>{ const r = x.r, c = x.c, p = c.disponivel>0 ? c.ordenado/c.disponivel*100 : (c.ordenado>0?100:0); return `<tr>
           <td class="nowrap"><b>${esc(r.ficha||'—')}</b>${r.codAplicacao?`<div class="small-txt">${esc(r.codAplicacao)}</div>`:''}</td>
           <td class="trunc"><a href="#" onclick="abrirRecurso('${r.id}');return false;"><b>${esc(r.apelido||r.componente||r.programa||r.descricao)}</b></a><div class="small-txt">${esc(r.descricao||'')}</div>${r.obs?`<div class="small-txt" style="color:var(--teal-dark)">${esc(r.obs)}</div>`:''}${r.ativo===false?'<span class="badge inativo">inativo</span>':''}</td>
           <td>${esc(r.fonte||'')}<div class="small-txt">${esc(r.transferencia||'')}</div></td><td class="small-txt trunc" style="max-width:170px;">${esc(r.elemento||'')}</td>
           <td class="num">${fmtMoney(c.inicial)}</td><td class="num">${fmtMoney(c.entradas+c.ajustes)}</td><td class="num">${fmtMoney(c.ordenado)}</td>
           <td class="num ${c.saldo<0?'neg':''}"><b>${fmtMoney(c.saldo)}</b></td><td class="num ${c.livre<0?'neg':''}">${fmtMoney(c.livre)}</td>
+          <td class="num nowrap">${balancetePeqHTML(r)}</td>
           <td style="min-width:100px;">${progHTML(p)}<span class="small-txt">${fmtPct(p)}</span></td>
           <td class="nowrap"><button class="btn ghost small edit-only" title="Lançar entrada de recurso" onclick="novaEntrada('${r.id}','entrada')">＋💵</button><button class="btn ghost small" title="Extrato" onclick="abrirRecurso('${r.id}')">📄</button></td></tr>`; }).join('')}</tbody>
-        <tfoot><tr><td colspan="4">Total ${esc(a)}</td><td class="num"></td><td class="num"></td><td class="num">${fmtMoney(t.ord)}</td><td class="num">${fmtMoney(t.saldo)}</td><td class="num">${fmtMoney(t.livre)}</td><td colspan="2"></td></tr></tfoot>
+        <tfoot><tr><td colspan="4">Total ${esc(a)}</td><td class="num"></td><td class="num"></td><td class="num">${fmtMoney(t.ord)}</td><td class="num">${fmtMoney(t.saldo)}</td><td class="num">${fmtMoney(t.livre)}</td><td colspan="3"></td></tr></tfoot>
       </table></div></div>`;
   }).join('');
   return `
@@ -1728,6 +1756,10 @@ function extratoRecursoHTML(r){
         <div class="stat" style="border-top-color:${c.saldo<0?'var(--red)':'var(--green)'}"><div class="label">Saldo</div><div class="value ${c.saldo<0?'neg':''}">${fmtMoney(c.saldo)}</div>${numOk(r.saldoPlanilha)?`<div class="hint">planilha em ${esc(r.dataSaldoPlanilha?fmtDateBR(r.dataSaldoPlanilha):'')}: ${fmtMoney(r.saldoPlanilha)}</div>`:''}</div>
         <div class="stat" style="border-top-color:var(--purple)"><div class="label">Livre p/ empenhar</div><div class="value ${c.livre<0?'neg':''}">${fmtMoney(c.livre)}</div><div class="hint">empenhado ${fmtMoney(c.empenhado)}</div></div>
       </div>
+      ${r.balancete?(()=>{ const b = r.balancete; return `<div class="helpbox" style="margin-top:12px;"><b>📥 Balancete ${esc(b.periodo||'')}</b> (ficha ${esc(b.ficha||'')}, cód. ${esc(b.codigo||'')}, importado em ${b.importadoEm?fmtDateBR(b.importadoEm.slice(0,10)):'—'}${b.importadoPor?' por '+esc(b.importadoPor):''}):
+        dotação atual <b>${fmtMoney(b.dotacao)}</b> · empenhado <b>${fmtMoney(b.empenhado)}</b> · liquidado ${fmtMoney(b.liquidado)} · pago ${fmtMoney(b.pago)} · a pagar ${fmtMoney(b.aPagar)} · saldo da dotação <b class="${b.saldoDotacao<0?'neg':''}">${fmtMoney(b.saldoDotacao)}</b>.
+        No mês: empenhado ${fmtMoney(b.empMes)} · liquidado ${fmtMoney(b.liqMes)} · pago ${fmtMoney(b.pagoMes)}.
+        ${Math.abs(r2(b.empenhado - c.ordenado))>0.009?`<br>Diferença entre o empenhado no balancete e o ordenado no app: <b>${fmtMoney(r2(b.empenhado - c.ordenado))}</b>.`:'<br>O empenhado no balancete bate com o ordenado no app.'}</div>`; })():''}
     </div>
     <div class="card"><h2>📄 Extrato</h2>
       <div class="table-wrap"><table><thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th class="num">Valor</th><th class="num">Saldo</th><th class="no-print"></th></tr></thead>
@@ -1812,8 +1844,276 @@ function excluirMovRecurso(id){
 function exportarRecursosExcel(){
   if(!window.XLSX){ showToast('A biblioteca do Excel não carregou.','error'); return; }
   const l = recursosDoExercicio().map(r=>{ const c = calcRecurso(r); return { 'Área':r.area, 'Ficha':r.ficha, 'Cód. aplicação':r.codAplicacao, 'Ordenamento/Tipo de despesa':r.descricao, 'Fonte':r.fonte, 'Transferência':r.transferencia, 'Elemento':r.elemento, 'Programa':r.programa, 'Componente':r.componente,
-    'Saldo inicial':c.inicial, 'Entradas':c.entradas, 'Ajustes':c.ajustes, 'Ordenado':c.ordenado, 'Pago':c.pago, 'Saldo':c.saldo, 'Empenhado':c.empenhado, 'Livre p/ empenhar':c.livre, 'Observação':r.obs||'' }; });
+    'Saldo inicial':c.inicial, 'Entradas':c.entradas, 'Ajustes':c.ajustes, 'Ordenado':c.ordenado, 'Pago':c.pago, 'Saldo':c.saldo, 'Empenhado':c.empenhado, 'Livre p/ empenhar':c.livre, 'Observação':r.obs||'',
+    'Balancete (período)': r.balancete ? r.balancete.periodo||'' : '', 'Dotação atual': r.balancete ? r.balancete.dotacao : '', 'Empenhado (balancete)': r.balancete ? r.balancete.empenhado : '',
+    'Liquidado (balancete)': r.balancete ? r.balancete.liquidado : '', 'Pago (balancete)': r.balancete ? r.balancete.pago : '', 'Saldo da dotação': r.balancete ? r.balancete.saldoDotacao : '' }; });
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(l), 'Recursos'); XLSX.writeFile(wb, 'recursos_'+exercicioSel+'.xlsx');
+}
+
+/* ============================================================
+   ATUALIZAÇÃO DE RECURSOS — importa o "Balancete da Despesa" (PDF do
+   sistema da contabilidade). Cada ficha do PDF traz duas linhas de valores:
+     1ª: Dotação atual | Emp. no mês | Liq. no mês | Emp. a pagar
+     2ª: Empenho atual | Liq. atual  | Pago no mês | Pagto atual
+   e o vínculo "TT - AAA BBB" (código de aplicação AAA.BBB).
+   Casa pelo nº da ficha + código de aplicação. Grava só r.balancete
+   (campo novo) — saldo inicial, entradas e notas não são alterados.
+   O ajuste de saldo é opcional e entra como um lançamento novo.
+   ============================================================ */
+const PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+const PDFJS_WORKER_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+let pdfJsCarregando = null;
+function carregarPdfJs(){
+  if(window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if(pdfJsCarregando) return pdfJsCarregando;
+  pdfJsCarregando = new Promise((resolve, reject)=>{
+    const s = document.createElement('script'); s.src = PDFJS_URL;
+    s.onload = ()=>{ if(!window.pdfjsLib){ pdfJsCarregando = null; reject(new Error('leitor de PDF indisponível')); return; } window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL; resolve(window.pdfjsLib); };
+    s.onerror = ()=>{ pdfJsCarregando = null; reject(new Error('não foi possível carregar o leitor de PDF (verifique a internet)')); };
+    document.head.appendChild(s);
+  });
+  return pdfJsCarregando;
+}
+async function pdfLinhasTexto(buf){
+  const lib = await carregarPdfJs();
+  const pdf = await lib.getDocument({ data: buf }).promise;
+  const linhas = [];
+  for(let p=1; p<=pdf.numPages; p++){
+    const tc = await (await pdf.getPage(p)).getTextContent();
+    const itens = tc.items.filter(it=>it.str && it.str.trim()).map(it=>({ x:it.transform[4], y:it.transform[5], s:it.str.trim() }))
+      .sort((a,b)=>b.y-a.y || a.x-b.x);
+    let cur = null;
+    itens.forEach(it=>{ if(cur && Math.abs(cur.y - it.y)<=2.5) cur.itens.push(it); else { cur = { y:it.y, pag:p, itens:[it] }; linhas.push(cur); } });
+  }
+  return linhas.map(l=>{
+    const vistos = new Set();
+    const its = l.itens.sort((a,b)=>a.x-b.x).filter(it=>{ const k = Math.round(it.x)+'|'+it.s; if(vistos.has(k)) return false; vistos.add(k); return true; });
+    return { pag:l.pag, txt: its.map(it=>it.s).join(' ').replace(/\s+/g,' ').trim() };
+  });
+}
+function numBalancete(s){ return r2(Number(String(s).replace(/\./g,'').replace(',','.'))||0); }
+const RX_VALOR = '(-?[\\d.]+,\\d{2})';
+const RX_FICHA_BAL = new RegExp('^(\\d{1,4}) (?:(\\d\\.\\d\\.\\d{2}\\.\\d{2}\\.\\d{2}) )?(.*?) ?(\\d{2}) - (\\d{3}) (\\d{3})(?: ([A-Z]{2}))? '+RX_VALOR+' '+RX_VALOR+' '+RX_VALOR+' '+RX_VALOR+'$');
+const RX_4VALORES = new RegExp('(?:^| )'+RX_VALOR+' '+RX_VALOR+' '+RX_VALOR+' '+RX_VALOR+'$');  // pode vir colada ao resto da especificação
+const RX_ACAO_BAL = /^(\d{2}\.\d{3}\.\d{4}\.\d{4}\.\d{4}) (.+)$/;
+function interpretarBalancete(linhas){
+  const res = { titulo:'', periodo:'', exercicio:'', fichas:[] };
+  let acao = '', acaoCod = '';
+  for(let i=0; i<linhas.length; i++){
+    const t = linhas[i].txt;
+    if(!res.titulo && /BALANCETE/i.test(t)){ res.titulo = t; const m = t.match(/\(\s*(\d{2}\/\d{2}\/\d{4})\s*A\s*(\d{2}\/\d{2}\/\d{4})\s*\)/i); if(m) res.periodo = m[1]+' a '+m[2]; }
+    if(!res.exercicio){ const m = t.match(/(?:^|\s)(20\d{2})$/); if(m && /Exerc|52\.382|\d{2}\.\d{3}\.\d{3}\/\d{4}/i.test(t+' '+((linhas[i-1]||{}).txt||''))) res.exercicio = m[1]; }
+    const a = t.match(RX_ACAO_BAL); if(a){ acaoCod = a[1]; acao = a[2]; continue; }
+    const m = t.match(RX_FICHA_BAL); if(!m) continue;
+    const f = { num: String(Number(m[1])), ficha: 'F-'+String(Number(m[1])).padStart(3,'0'), economica: m[2]||'', especificacao: (m[3]||'').trim(), tipo: m[4], codigo: m[5]+'.'+m[6],
+      acao, acaoCod, dotacao: numBalancete(m[8]), empMes: numBalancete(m[9]), liqMes: numBalancete(m[10]), aPagar: numBalancete(m[11]), pag: linhas[i].pag };
+    // 2ª linha de valores: a próxima linha só com 4 valores (pode cair na página seguinte)
+    for(let j=i+1; j<linhas.length && j<i+25; j++){
+      const tj = linhas[j].txt;
+      if(RX_FICHA_BAL.test(tj)) break;
+      if(/^\d\.\d\.\d{2}\.\d{2}\.\d{2} /.test(tj)) continue;  // linha de subelemento (4.4.90.52.35 …)
+      const k = tj.match(RX_4VALORES);
+      if(k){ f.empenhado = numBalancete(k[1]); f.liquidado = numBalancete(k[2]); f.pagoMes = numBalancete(k[3]); f.pago = numBalancete(k[4]); break; }
+    }
+    if(f.empenhado===undefined){ f.empenhado = 0; f.liquidado = 0; f.pagoMes = 0; f.pago = 0; f.semSegundaLinha = true; }
+    f.saldoDotacao = r2(f.dotacao - f.empenhado);
+    res.fichas.push(f);
+  }
+  return res;
+}
+function numFicha(s){ const m = String(s||'').match(/(\d{1,4})/); return m ? String(Number(m[1])) : ''; }
+let balImport = null;
+function casarBalancete(dados){
+  const recs = recursosDoExercicio();
+  const usados = new Set();
+  dados.fichas.forEach(f=>{
+    const mesmos = recs.filter(r=>numFicha(r.ficha)===f.num);
+    const comCod = mesmos.filter(r=>!r.codAplicacao || r.codAplicacao===f.codigo);
+    f.recIds = (comCod.length ? comCod : mesmos).map(r=>r.id);
+    f.status = !mesmos.length ? 'nova' : comCod.length ? 'confere' : 'codigo';
+    f.marcado = f.status==='confere';
+    f.recIds.forEach(id=>usados.add(id));
+  });
+  dados.soNoApp = recs.filter(r=>r.ativo!==false && !usados.has(r.id)).map(r=>r.id);
+  return dados;
+}
+async function lerBalancetePdf(ev){
+  const arq = ev.target.files && ev.target.files[0]; ev.target.value = '';
+  if(!arq) return;
+  if(!/\.pdf$/i.test(arq.name)){ showToast('Escolha o arquivo PDF do balancete.','warning'); return; }
+  balImport = { carregando:true, arquivo:arq.name }; render();
+  try{
+    const linhas = await pdfLinhasTexto(await arq.arrayBuffer());
+    const dados = interpretarBalancete(linhas);
+    if(!dados.fichas.length){ balImport = null; render(); showToast('Não encontrei fichas neste PDF. Ele precisa ser o “Balancete da Despesa” gerado pelo sistema (com texto, não digitalizado).','error'); return; }
+    dados.arquivo = arq.name; dados.ajustarSaldo = false; dados.filtro = 'casadas';
+    balImport = casarBalancete(dados);
+    if(dados.exercicio && Number(dados.exercicio)!==exercicioSel) showToast(`Atenção: o balancete é do exercício ${dados.exercicio} e o app está no exercício ${exercicioSel}.`,'warning');
+    render();
+  }catch(e){ console.error(e); balImport = null; render(); showToast('Não foi possível ler o PDF: '+(e.message||e),'error'); }
+}
+function viewAtualizacaoRecursos(){
+  const ultimo = recursosDoExercicio().map(r=>r.balancete).filter(Boolean).sort((a,b)=>(b.importadoEm||'').localeCompare(a.importadoEm||''))[0];
+  const topo = `<div class="card"><h2>📥 Atualização de recursos</h2>
+    <div class="subtitle">Importe o PDF do <b>Balancete da Despesa</b> da contabilidade. O app lê cada ficha (dotação atual, empenhado, liquidado e pago) e liga ao recurso pelo <b>nº da ficha</b> e pelo <b>código de aplicação</b> (recurso/componente). Nada é gravado antes de você conferir e clicar em “Aplicar”.</div>
+    <div class="actions" style="margin-top:12px;"><label class="btn edit-only">📄 Escolher PDF do balancete<input type="file" accept=".pdf,application/pdf" style="display:none" onchange="lerBalancetePdf(event)"></label>
+      ${balImport?`<button class="btn secondary" onclick="balImport=null;render()">Cancelar importação</button>`:''}
+      ${ultimo?`<span class="small-txt">Último balancete aplicado: <b>${esc(ultimo.periodo||ultimo.arquivo||'')}</b> em ${fmtDateBR((ultimo.importadoEm||'').slice(0,10))}${ultimo.importadoPor?' por '+esc(ultimo.importadoPor):''}</span>`:''}</div></div>`;
+  if(!balImport) return topo;
+  if(balImport.carregando) return topo + `<div class="card muted">⏳ Lendo ${esc(balImport.arquivo)}…</div>`;
+  const B = balImport;
+  const cont = { confere:0, codigo:0, nova:0 }; B.fichas.forEach(f=>cont[f.status]++);
+  const vis = B.fichas.filter(f=>B.filtro==='todas' || (B.filtro==='casadas' ? f.status!=='nova' : f.status===B.filtro));
+  const rot = { confere:'<span class="badge ok">confere</span>', codigo:'<span class="badge ambar">código diferente</span>', nova:'<span class="badge neutro">não cadastrada</span>' };
+  const marcadas = B.fichas.filter(f=>f.marcado && f.recIds.length);
+  const linha = f=>{
+    const recs = f.recIds.map(getRecurso).filter(Boolean);
+    const disp = recs.reduce((s,r)=>s+calcRecurso(r).disponivel,0), ord = recs.reduce((s,r)=>s+calcRecurso(r).ordenado,0);
+    const ajuste = recs.length===1 ? r2(f.dotacao - disp) : null;
+    return `<tr>
+      <td>${f.recIds.length?`<input type="checkbox" ${f.marcado?'checked':''} onchange="balMarcar('${f.num}',this.checked)">`:''}</td>
+      <td class="nowrap"><b>${esc(f.ficha)}</b><div class="small-txt">${esc(f.codigo)}</div></td>
+      <td class="trunc" style="max-width:260px;"><div class="small-txt">${esc(f.acao)}</div>${esc(f.especificacao)} <span class="small-txt">${esc(f.economica)}</span></td>
+      <td>${rot[f.status]}${recs.map(r=>`<div class="small-txt">${esc(recursoCurto(r)||recursoRotulo(r))}${r.codAplicacao&&r.codAplicacao!==f.codigo?' <b style="color:var(--red)">(app: '+esc(r.codAplicacao)+')</b>':''}</div>`).join('')}
+        ${f.status==='nova'?`<button class="btn ghost small edit-only" onclick="balCadastrarNova('${f.num}')">＋ Cadastrar recurso</button>`:''}</td>
+      <td class="num">${fmtMoney(f.dotacao)}</td><td class="num">${fmtMoney(f.empenhado)}</td><td class="num">${fmtMoney(f.liquidado)}</td><td class="num">${fmtMoney(f.pago)}</td>
+      <td class="num ${f.saldoDotacao<0?'neg':''}"><b>${fmtMoney(f.saldoDotacao)}</b></td>
+      <td class="num">${recs.length?fmtMoney(ord):''}${recs.length&&Math.abs(r2(ord-f.empenhado))>0.009?`<div class="small-txt" style="color:var(--amber,#b7791f)">dif. ${fmtNumBR(r2(f.empenhado-ord))}</div>`:''}</td>
+      <td class="num">${recs.length?fmtMoney(disp):''}${B.ajustarSaldo&&f.marcado?(ajuste===null?'<div class="small-txt">várias linhas — sem ajuste</div>':Math.abs(ajuste)>0.009?`<div class="small-txt"><b>ajuste ${ajuste>0?'+':''}${fmtNumBR(ajuste)}</b></div>`:''):''}</td></tr>`;
+  };
+  return topo + `<div class="card">
+    <div class="flexrow"><h2>${esc(B.titulo||'Balancete')}</h2><span class="small-txt">${esc(B.arquivo)} · ${B.fichas.length} ficha(s) no PDF</span></div>
+    <div class="filtros" style="margin-top:10px;">
+      <div class="field"><label>Mostrar</label><select onchange="balImport.filtro=this.value;render()">${[['casadas','Fichas cadastradas no app ('+(cont.confere+cont.codigo)+')'],['confere','Só as que conferem ('+cont.confere+')'],['codigo','Código de aplicação diferente ('+cont.codigo+')'],['nova','Não cadastradas no app ('+cont.nova+')'],['todas','Todas ('+B.fichas.length+')']].map(o=>`<option value="${o[0]}" ${B.filtro===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select></div>
+      <button class="btn ghost small" onclick="balMarcarTodas(true)">Marcar as que conferem</button><button class="btn ghost small" onclick="balMarcarTodas(false)">Desmarcar todas</button>
+      <label class="check"><input type="checkbox" ${B.ajustarSaldo?'checked':''} onchange="balImport.ajustarSaldo=this.checked;render()"> Também lançar ajuste para o “Disponível” do app ficar igual à dotação atual</label>
+    </div>
+    <div class="helpbox">✔ <b>confere</b> = mesma ficha e mesmo código de aplicação · ⚠ <b>código diferente</b> = a ficha existe no app, mas com outro código (confira antes de marcar) · <b>não cadastrada</b> = ficha do balancete que não está no app.
+      Ao aplicar, cada recurso marcado guarda a posição do balancete (aparece na coluna “Balancete” e no extrato). Saldo inicial, entradas e notas <b>não</b> mudam${B.ajustarSaldo?'; o ajuste marcado entra como lançamento novo de “± Ajuste”, que pode ser excluído no extrato':''}.
+      ${B.soNoApp.length?`<br>${B.soNoApp.length} recurso(s) ativo(s) do app não aparecem neste balancete: ${B.soNoApp.slice(0,12).map(id=>esc(recursoCurto(getRecurso(id)))).join(', ')}${B.soNoApp.length>12?'…':''}`:''}</div>
+    <div class="table-wrap" style="margin-top:10px;max-height:560px;"><table>
+      <thead><tr><th></th><th>Ficha</th><th>Ação / especificação</th><th>Recurso no app</th><th class="num">Dotação atual</th><th class="num">Empenhado</th><th class="num">Liquidado</th><th class="num">Pago</th><th class="num">Saldo dotação</th><th class="num">Ordenado no app</th><th class="num">Disponível no app</th></tr></thead>
+      <tbody>${vis.map(linha).join('') || '<tr class="empty-row"><td colspan="11">Nenhuma ficha neste filtro.</td></tr>'}</tbody></table></div>
+    <div class="actions" style="margin-top:12px;"><button class="btn edit-only" ${marcadas.length?'':'disabled'} onclick="aplicarBalancete()">✔ Aplicar em ${marcadas.length} ficha(s) marcada(s)</button></div>
+  </div>`;
+}
+function balMarcar(num, v){ const f = balImport && balImport.fichas.find(x=>x.num===num); if(f){ f.marcado = v; render(); } }
+function balMarcarTodas(v){ if(!balImport) return; balImport.fichas.forEach(f=>{ f.marcado = v ? f.status==='confere' : false; }); render(); }
+function balCadastrarNova(num){
+  if(semPermissao('recursos')) return;
+  const f = balImport && balImport.fichas.find(x=>x.num===num); if(!f) return;
+  if(!confirm(`Cadastrar a ficha ${f.ficha} (cód. ${f.codigo}) como recurso novo?\n\nEla entra com saldo inicial R$ 0,00 — depois você pode editar o cadastro, lançar entradas ou usar o ajuste desta tela.`)) return;
+  const r = { id: uid(), criadoEm:new Date().toISOString(), exercicio:exercicioSel, area:filtroRecursos.area||lista('areas')[0]||'', ativo:true, ficha:f.ficha, codAplicacao:f.codigo,
+    descricao: f.especificacao, programa: f.acao, componente: f.acao+' ('+f.ficha+')/CÓD. APLIC: '+f.codigo, elemento: f.economica, saldoInicial:0, dataSaldo:exercicioSel+'-01-01', rotuloSaldo:'Cadastrado pelo balancete' };
+  STATE.recursos.push(r); saveState(); registrarAcao('Recurso cadastrado pelo balancete: '+f.ficha);
+  balImport = casarBalancete(balImport); const g = balImport.fichas.find(x=>x.num===num); if(g) g.marcado = true;
+  render(); showToast(`Ficha ${f.ficha} cadastrada. Confira a área em “Editar cadastro”.`,'success');
+}
+function aplicarBalancete(){
+  if(semPermissao('recursos') || !balImport) return;
+  const B = balImport, marcadas = B.fichas.filter(f=>f.marcado && f.recIds.length);
+  if(!marcadas.length) return;
+  const ajustes = [];
+  if(B.ajustarSaldo) marcadas.forEach(f=>{ if(f.recIds.length!==1) return; const r = getRecurso(f.recIds[0]); const v = r2(f.dotacao - calcRecurso(r).disponivel); if(Math.abs(v)>0.009) ajustes.push({ r, f, v }); });
+  if(!confirm(`Aplicar o balancete ${B.periodo||''} em ${marcadas.length} ficha(s)?${ajustes.length?`\n\nTambém serão lançados ${ajustes.length} ajuste(s) de saldo.`:''}`)) return;
+  const agora = new Date().toISOString(), quem = currentUser ? (currentUser.nome||currentUser.usuario) : '';
+  let n = 0;
+  marcadas.forEach(f=>f.recIds.forEach(id=>{ const r = getRecurso(id); if(!r) return;
+    r.balancete = { periodo:B.periodo, titulo:B.titulo, arquivo:B.arquivo, ficha:f.ficha, codigo:f.codigo, economica:f.economica, especificacao:f.especificacao, acao:f.acao,
+      dotacao:f.dotacao, empMes:f.empMes, liqMes:f.liqMes, aPagar:f.aPagar, empenhado:f.empenhado, liquidado:f.liquidado, pagoMes:f.pagoMes, pago:f.pago, saldoDotacao:f.saldoDotacao,
+      importadoEm:agora, importadoPor:quem };
+    n++; }));
+  saveState();
+  ajustes.forEach(a=>movGravar({ tipo:'ajuste', recursoId:a.r.id, data:hojeISO(), valor:a.v, descricao:'Atualização pelo balancete '+(B.periodo||'')+' — disponível igualado à dotação atual', criadoEm:agora }));
+  registrarAcao(`Atualização de recursos pelo balancete ${B.periodo||B.arquivo}: ${n} recurso(s)${ajustes.length?', '+ajustes.length+' ajuste(s)':''}`);
+  balImport = null; abaRecursos = 'saldos'; render();
+  showToast(`Balancete aplicado em ${n} recurso(s)${ajustes.length?' com '+ajustes.length+' ajuste(s)':''}.`,'success');
+}
+
+/* ============================================================
+   RELAÇÃO DE NOTAS ORDENADAS — "Transferência intersetorial" (modelo
+   PLANILHA TRANSFERENCIA NOTAS.xlsx): notas pela data de emissão no
+   período, com departamento de destino e conferido pelo usuário logado.
+   ============================================================ */
+let relNotas = null;
+function relNotasEstado(){
+  if(relNotas) return relNotas;
+  const h = hojeISO(), a = h.slice(0,4), m = h.slice(5,7);
+  let depto = ''; try{ depto = localStorage.getItem(LOCAL_PREFIXO+'relDepto') || ''; }catch(e){}
+  relNotas = { de: a+'-'+m+'-01', ate: a+'-'+m+'-'+pad2(new Date(Number(a), Number(m), 0).getDate()), departamento: depto || lista('departamentos')[0] || '', area:'', situacao:'', fora:{} };
+  return relNotas;
+}
+function relNotasLista(){
+  const R = relNotasEstado();
+  return movPorTipo('nota').filter(n=>!n.historico && n.situacao!=='cancelada')
+    .map(n=>({ n, d: n.emissao || n.data || '' }))
+    .filter(x=>x.d && (!R.de || x.d>=R.de) && (!R.ate || x.d<=R.ate))
+    .filter(x=>!R.situacao || x.n.situacao===R.situacao)
+    .filter(x=>{ if(!R.area) return true; const r = getRecurso(x.n.recursoId); return r && r.area===R.area; })
+    .sort((a,b)=>a.d.localeCompare(b.d) || String(a.n.credor||'').localeCompare(String(b.n.credor||''),'pt-BR') || String(a.n.nf||'').localeCompare(String(b.n.nf||''),'pt-BR',{numeric:true}));
+}
+function relNotasConferente(){ return currentUser ? (currentUser.nome || currentUser.usuario || '') : ''; }
+function relNotasTitulo(){ const d = relNotasEstado().departamento; return 'TRANSFERÊNCIA INTERSETORIAL - SMS'+(d?'/'+d.toUpperCase():'')+' PMJ'; }
+function relNotasDocHTML(itens){
+  const agora = new Date(), carimbo = agora.toLocaleDateString('pt-BR')+' '+pad2(agora.getHours())+':'+pad2(agora.getMinutes());
+  const total = itens.reduce((s,x)=>s+(Number(x.n.valor)||0),0);
+  return `<div class="rn-doc">
+    <div class="rn-tit"><span>${esc(relNotasTitulo())}</span><span>NOTAS FISCAIS</span></div>
+    <div class="rn-sub">${carimbo}${relNotas.de||relNotas.ate?` &nbsp;·&nbsp; Emissão de ${relNotas.de?fmtDateBR(relNotas.de):'…'} a ${relNotas.ate?fmtDateBR(relNotas.ate):'…'}`:''}</div>
+    <table class="rn-tab"><thead><tr><th style="width:17%">NF Nº</th><th style="width:16%">DATA DE EMISSÃO</th><th>FORNECEDOR</th><th style="width:19%">VALOR</th></tr></thead>
+    <tbody>${itens.map(x=>`<tr><td>${esc(x.n.nf||'')}</td><td>${x.d?fmtDateBR(x.d):''}${x.n.emissao?'':'*'}</td><td>${esc((x.n.credor||x.n.modeloRotulo||'').toUpperCase())}</td><td class="rn-v">${fmtMoney(x.n.valor)}</td></tr>`).join('') || '<tr><td colspan="4" style="text-align:center;">Nenhuma nota no período.</td></tr>'}</tbody>
+    <tfoot><tr><td colspan="3">TOTAL — ${itens.length} nota(s)</td><td class="rn-v">${fmtMoney(total)}</td></tr></tfoot></table>
+    ${itens.some(x=>!x.n.emissao)?'<div class="rn-obs">* nota sem data de emissão cadastrada — usada a data do ordenamento.</div>':''}
+    <div class="rn-ass"><b>CONFERIDO:</b> ${esc(relNotasConferente())}</div>
+    <div class="rn-ass rn-rec"><span><b>RECEBIDO:</b> ______________________________________</span><span><b>DATA:</b> ____/____/________</span></div>
+  </div>`;
+}
+function viewRelacaoNotas(){
+  const R = relNotasEstado();
+  const todas = relNotasLista(), itens = todas.filter(x=>!R.fora[x.n.id]);
+  const deptos = lista('departamentos');
+  return `<div class="card no-print">
+    <h2>📋 Relação de notas ordenadas</h2>
+    <div class="subtitle">Lista as notas ordenadas pela <b>data de emissão</b> dentro do período, para enviar a outro departamento. “Conferido” sai com o nome de quem está logado. Os departamentos são cadastrados em Cadastros → Listas de opções.</div>
+    <div class="filtros" style="margin-top:10px;">
+      <div class="field"><label>Período inicial (emissão)</label><input type="date" value="${esc(R.de)}" onchange="relNotas.de=this.value;render()"></div>
+      <div class="field"><label>Período final (emissão)</label><input type="date" value="${esc(R.ate)}" onchange="relNotas.ate=this.value;render()"></div>
+      <div class="field"><label>Departamento</label><select onchange="relNotas.departamento=this.value;try{localStorage.setItem(LOCAL_PREFIXO+'relDepto',this.value)}catch(e){};render()"><option value="">—</option>${deptos.map(d=>`<option ${R.departamento===d?'selected':''}>${esc(d)}</option>`).join('')}${R.departamento&&!deptos.includes(R.departamento)?`<option selected>${esc(R.departamento)}</option>`:''}</select></div>
+      <div class="field"><label>Área</label><select onchange="relNotas.area=this.value;render()"><option value="">Todas</option>${lista('areas').map(a=>`<option ${R.area===a?'selected':''}>${esc(a)}</option>`).join('')}</select></div>
+      <div class="field"><label>Situação</label><select onchange="relNotas.situacao=this.value;render()"><option value="">Todas (menos canceladas)</option>${SITUACOES.filter(s=>s.k!=='cancelada').map(s=>`<option value="${s.k}" ${R.situacao===s.k?'selected':''}>${s.n}</option>`).join('')}</select></div>
+      <div class="field"><label>Conferido</label><input value="${esc(relNotasConferente())}" disabled></div>
+    </div>
+    <div class="actions"><button class="btn" onclick="imprimirRelacaoNotas()">🖨️ Imprimir relação</button><button class="btn secondary" onclick="exportarRelacaoNotasExcel()">⭳ Excel</button>
+      <span class="small-txt">${itens.length} de ${todas.length} nota(s) selecionada(s) · ${fmtMoney(itens.reduce((s,x)=>s+(Number(x.n.valor)||0),0))}</span>
+      ${todas.length?`<button class="btn ghost small" onclick="relNotas.fora={};render()">Marcar todas</button><button class="btn ghost small" onclick="relNotasLista().forEach(x=>relNotas.fora[x.n.id]=1);render()">Desmarcar todas</button>`:''}</div>
+    <div class="table-wrap" style="margin-top:10px;max-height:380px;"><table>
+      <thead><tr><th></th><th>Emissão</th><th>NF</th><th>Fornecedor</th><th>Recurso</th><th>Nº ordenamento</th><th>Situação</th><th class="num">Valor</th></tr></thead>
+      <tbody>${todas.map(x=>{ const n = x.n, r = getRecurso(n.recursoId); return `<tr style="${R.fora[n.id]?'opacity:.45':''}"><td><input type="checkbox" ${R.fora[n.id]?'':'checked'} onchange="if(this.checked) delete relNotas.fora['${n.id}']; else relNotas.fora['${n.id}']=1; render()"></td>
+        <td class="nowrap">${fmtDateBR(x.d)}${n.emissao?'':' <span class="small-txt" title="Sem data de emissão — usada a data do ordenamento">(ord.)</span>'}</td><td><b>${esc(n.nf||'')}</b></td><td class="trunc">${esc(n.credor||n.modeloRotulo||'')}</td>
+        <td class="small-txt trunc">${esc(r?recursoCurto(r):'')}</td><td>${esc(numeroOrdenamento(n))}</td><td>${badgeSituacao(n.situacao)}</td><td class="num">${fmtMoney(n.valor)}</td></tr>`; }).join('') || '<tr class="empty-row"><td colspan="8">Nenhuma nota ordenada com emissão neste período.</td></tr>'}</tbody></table></div>
+  </div>
+  <div class="card"><div class="small-txt no-print" style="margin-bottom:8px;">Prévia da impressão</div><div id="relNotasDoc">${relNotasDocHTML(itens)}</div></div>`;
+}
+function imprimirRelacaoNotas(){
+  const R = relNotasEstado();
+  if(!R.departamento && !confirm('Nenhum departamento escolhido. Imprimir assim mesmo?')) return;
+  const el = document.getElementById('relNotasDoc'); if(!el) return;
+  el.innerHTML = relNotasDocHTML(relNotasLista().filter(x=>!R.fora[x.n.id]));
+  registrarAcao('Imprimiu relação de notas ordenadas ('+(R.departamento||'sem departamento')+')');
+  el.classList.add('print-target'); window.print(); setTimeout(()=>el.classList.remove('print-target'), 500);
+}
+function exportarRelacaoNotasExcel(){
+  if(!window.XLSX){ showToast('A biblioteca do Excel não carregou.','error'); return; }
+  const R = relNotasEstado(), itens = relNotasLista().filter(x=>!R.fora[x.n.id]);
+  const agora = new Date();
+  const aoa = [[relNotasTitulo(),'','','NOTAS FISCAIS'], [agora.toLocaleDateString('pt-BR')+' '+pad2(agora.getHours())+':'+pad2(agora.getMinutes())], [], ['NF Nº','DATA DE EMISSÃO','FORNECEDOR','VALOR']];
+  itens.forEach(x=>aoa.push([x.n.nf||'', x.d?fmtDateBR(x.d):'', (x.n.credor||x.n.modeloRotulo||'').toUpperCase(), Number(x.n.valor)||0]));
+  aoa.push(['TOTAL','',itens.length+' nota(s)', r2(itens.reduce((s,x)=>s+(Number(x.n.valor)||0),0))], [], ['CONFERIDO: '+relNotasConferente()], [], ['RECEBIDO:','','','DATA:']);
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{wch:14},{wch:16},{wch:48},{wch:16}];
+  for(let i=4; i<aoa.length; i++){ const c = ws[XLSX.utils.encode_cell({r:i, c:3})]; if(c && c.t==='n') c.z = '"R$" #,##0.00'; }
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Relação de notas');
+  XLSX.writeFile(wb, 'relacao_notas_'+(R.departamento||'sms').toLowerCase().replace(/[^a-z0-9]+/gi,'_')+'_'+(R.de||'')+'_a_'+(R.ate||'')+'.xlsx');
 }
 
 /* ============================================================

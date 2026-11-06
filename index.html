@@ -154,8 +154,36 @@ td.nowrap{white-space:nowrap;}
 .filtros .field.busca{flex:1;min-width:220px;}
 
 .tabs{display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid var(--line);flex-wrap:wrap;}
-.tab{padding:9px 16px;font-size:12.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;border-bottom:2px solid transparent;}
-.tab.active{color:var(--teal-dark);border-bottom-color:var(--teal);}
+/* abas coloridas (06/11/2026, 1.12): cada aba tem a sua cor (--tc); vale para qualquer barra de abas */
+.tab{--tc:#1C6A8C;padding:9px 16px;font-size:12.5px;font-weight:700;cursor:pointer;color:var(--tc);border:1px solid color-mix(in srgb,var(--tc) 28%,#fff);border-top:3px solid var(--tc);border-bottom:none;border-radius:9px 9px 0 0;background:color-mix(in srgb,var(--tc) 9%,#fff);margin-bottom:-1px;transition:background .15s;}
+.tab:hover{background:color-mix(in srgb,var(--tc) 18%,#fff);}
+.tab.active{background:var(--tc);color:#fff;box-shadow:0 -2px 8px color-mix(in srgb,var(--tc) 35%,transparent);}
+.tabs .tab:nth-child(6n+1){--tc:#1C6A8C;} .tabs .tab:nth-child(6n+2){--tc:#2E8B57;} .tabs .tab:nth-child(6n+3){--tc:#C8711E;}
+.tabs .tab:nth-child(6n+4){--tc:#7B3FA0;} .tabs .tab:nth-child(6n+5){--tc:#B5394A;} .tabs .tab:nth-child(6n+6){--tc:#0E7C86;}
+/* carimbo de retenção IR (1.12) */
+.cir{border:1.6px solid #000;font-family:Calibri,Arial,sans-serif;color:#000;background:#fff;height:100%;box-sizing:border-box;display:flex;flex-direction:column;}
+.cir-cab{display:flex;align-items:center;gap:10px;padding:5px 8px 2px;}
+.cir-cab img{height:60px;width:auto;}
+.cir-tit{flex:1;text-align:center;font-family:Verdana,Arial,sans-serif;font-weight:700;font-size:11.5px;line-height:1.3;}
+.cir-leg{text-align:center;font-weight:700;font-size:10.5px;line-height:1.35;padding:2px 6px 5px;}
+.cir table{width:100%;border-collapse:collapse;table-layout:fixed;}
+.cir-ref td{border-top:1.2px solid #000;padding:3px 7px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cir-ref td+td{border-left:1px solid #000;}
+.cir-val th,.cir-val td{border:1px solid #000;border-left:none;padding:2px 7px;font-size:11.5px;}
+.cir-val tr>*:last-child{border-right:none;}
+.cir-val th{font-weight:700;text-align:center;}
+.cir-val .v{display:flex;justify-content:space-between;}
+.cir-val .liq td{text-align:center;font-weight:700;}
+.cir-ass{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;padding:0 0 3px;font-size:11px;border-top:1.2px solid #000;}
+.cir-ass .ln{width:52%;border-top:1px solid #000;margin-bottom:2px;}
+.cir-rod{display:flex;justify-content:space-between;font-size:9px;color:#333;padding:0 7px 2px;}
+.cir-folha{width:194mm;display:flex;flex-direction:column;}
+.cir-slot{height:89mm;box-sizing:border-box;}
+.cir-corte{position:relative;height:6mm;display:flex;align-items:center;}
+.cir-corte:before{content:'';flex:1;border-top:1.4px dashed #555;}
+.cir-corte span{position:absolute;left:50%;transform:translateX(-50%);background:#fff;padding:0 8px;font-size:9px;color:#555;white-space:nowrap;}
+.cir-prev{background:#E9EEF1;padding:14px;border-radius:10px;overflow:auto;}
+.cir-prev .cir-folha{background:#fff;padding:6mm 8mm;margin:0 auto;box-shadow:0 2px 10px rgba(0,0,0,.15);width:194mm;box-sizing:content-box;}
 .rn-doc{background:#fff;color:#000;font-family:Calibri,Arial,sans-serif;max-width:760px;margin:0 auto;padding:6px 4px;}
 .rn-tit{display:flex;justify-content:space-between;gap:16px;font-size:17px;font-weight:800;}
 .rn-sub{font-weight:700;font-size:12.5px;margin:4px 0 14px;}
@@ -523,7 +551,7 @@ function mostrarTelaRegras(){
    Criação: novembro/2026 (mês 1).
    ============================================================ */
 const APP_CRIACAO = { mes: 11, ano: 2026 };
-const APP_ALTERACAO = 11;
+const APP_ALTERACAO = 12;
 const APP_DATA = '2026-11-06';
 function appVersao(){
   const p = APP_DATA.split('-').map(Number);
@@ -1782,7 +1810,7 @@ let recursoAbertoId = null, recursoEditId = null;
 function abrirRecurso(id){ recursoAbertoId = id; recursoEditId = null; currentView = 'recursos'; render(); window.scrollTo(0,0); }
 let abaRecursos = 'saldos';
 function abasRecursosHTML(){
-  const abas = [['saldos','💰 Recursos e saldos'],['atualizacao','📥 Atualização de recursos'],['relacao','📋 Relação de notas ordenadas'],['emendas','📜 Emendas e portarias']];
+  const abas = [['saldos','💰 Recursos e saldos'],['atualizacao','📥 Atualização de recursos'],['relacao','📋 Relação de notas ordenadas'],['retencao','🧾 Carimbo de retenção IR'],['emendas','📜 Emendas e portarias']];
   return `<div class="tabs">${abas.map(a=>`<div class="tab ${abaRecursos===a[0]?'active':''}" onclick="abaRecursos='${a[0]}';render()">${a[1]}</div>`).join('')}</div>`;
 }
 function viewRecursos(){
@@ -1790,6 +1818,7 @@ function viewRecursos(){
   if(recursoAbertoId && getRecurso(recursoAbertoId)) return extratoRecursoHTML(getRecurso(recursoAbertoId));
   if(abaRecursos==='atualizacao') return abasRecursosHTML() + viewAtualizacaoRecursos();
   if(abaRecursos==='relacao') return abasRecursosHTML() + viewRelacaoNotas();
+  if(abaRecursos==='retencao') return abasRecursosHTML() + viewCarimboIR();
   if(abaRecursos==='emendas') return abasRecursosHTML() + viewEmendasPortarias();
   return abasRecursosHTML() + viewRecursosSaldos();
 }
@@ -2538,6 +2567,174 @@ function relNotasDocHTML(itens){
     <div class="rn-ass"><b>CONFERIDO:</b> ${esc(relNotasConferente())}</div>
     <div class="rn-ass rn-rec"><span><b>RECEBIDO:</b> ______________________________________</span><span><b>DATA:</b> ____/____/________</span></div>
   </div>`;
+}
+/* ============================================================
+   CARIMBO DE RETENÇÃO IR (06/11/2026, 1.12) — modelo "Carimbo Retenção IR.xlsx":
+   um carimbo por nota de fornecedor NÃO optante pelo Simples, 3 por folha A4 com linha
+   de corte. Usa o mesmo cálculo da Relação de notas (retencaoItem: IR da natureza do
+   fornecedor ou a escolhida na nota). Textos do cabeçalho editáveis em STATE.carimboIR.
+   Carimbos avulsos ficam só na tela (não gravam nada).
+   ============================================================ */
+const CIR_PADRAO = { titulo:'PLANILHA DE RETENÇÃO DO IMPOSTO DE RENDA - IMPOSTO DE RENDA RETIDO NA FONTE (IRRF)',
+  linha1:'INSTRUÇÃO NORMATIVA (RFB) : IN 1.234/2012 ALTERADA SUBSEQUENTEMENTE PELA IN 2.145/2023', linha2:'REGULAMENTADO PELO DECRETO MUNICIPAL N° 1.656/2023' };
+function cirTextos(){ return Object.assign({}, CIR_PADRAO, STATE.carimboIR||{}); }
+let carIR = null;
+function carIREstado(){
+  if(carIR) return carIR;
+  const R = relNotasEstado();
+  carIR = { campoData:R.campoData||'data', de:R.de, ate:R.ate, busca:'', fora:{}, avulsos:[], consultando:false, verTextos:false, autoFeito:'' };
+  return carIR;
+}
+function cirRet(n){ const R = relNotasEstado(), ant = R.descontar; R.descontar = true; try{ return retencaoItem({ n, d: n.emissao || n.data || '' }); } finally{ R.descontar = ant; } }
+function carIRNotas(){
+  const C = carIREstado(), t = normTxt(C.busca||'');
+  return movPorTipo('nota').filter(n=>!n.historico && n.situacao!=='cancelada')
+    .map(n=>({ n, f: C.campoData==='emissao' ? (n.emissao||n.data||'') : (n.data||n.emissao||'') }))
+    .filter(x=>x.f && (!C.de || x.f>=C.de) && (!C.ate || x.f<=C.ate))
+    .filter(x=>!t || normTxt([x.n.nf, x.n.credor, x.n.modeloRotulo, numeroOrdenamento(x.n)].join(' ')).includes(t))
+    .map(x=>Object.assign(x, { t: cirRet(x.n) }))
+    .sort((a,b)=>String(a.n.emissao||a.n.data||'').localeCompare(String(b.n.emissao||b.n.data||'')) || String(a.n.credor||'').localeCompare(String(b.n.credor||''),'pt-BR'));
+}
+function cirDadosNota(x){
+  const n = x.n, t = x.t, c = t.c;
+  return { nf:n.nf||'', emissao:n.emissao||'', credor:(c&&c.nome)||n.credor||n.modeloRotulo||'', doc:t.doc||'', valor:t.valor, pct:t.pct, ir:t.desc, liq:t.liq, cod:t.cod, ordenamento: n.numero?numeroOrdenamento(n):'' };
+}
+function cirItensImpressao(){
+  const C = carIREstado();
+  return carIRNotas().filter(x=>x.t.simples==='N' && !C.fora[x.n.id]).map(cirDadosNota).concat(C.avulsos.filter(a=>a.ativo!==false));
+}
+function carimboIRHTML(d){
+  const T = cirTextos(), brasao = imgEntidade(STATE.entidade.brasao);
+  const m = v=>`<span class="v"><span>R$</span><span>${fmtNumBR(v||0)}</span></span>`;
+  return `<div class="cir">
+    <div class="cir-cab">${brasao?`<img src="${brasao}" alt="">`:''}<div class="cir-tit">${esc(T.titulo)}</div></div>
+    <div class="cir-leg">${esc(T.linha1)}${T.linha2?'<br>'+esc(T.linha2):''}</div>
+    <table class="cir-ref"><colgroup><col style="width:34%"><col style="width:30%"><col></colgroup>
+      <tr><td><b>NOTA FISCAL Nº:</b> ${esc(d.nf||'—')}</td><td><b>EMISSÃO:</b> ${d.emissao?fmtDateBR(d.emissao):'—'}</td><td><b>ORDENAMENTO:</b> ${esc(d.ordenamento||'—')}</td></tr>
+      <tr><td colspan="3"><b>CREDOR:</b> ${esc(String(d.credor||'').toUpperCase())}${d.doc?` &nbsp;—&nbsp; ${d.doc.length===14?'CNPJ':'CPF'} ${esc(fmtCNPJ(d.doc))}`:''}</td></tr></table>
+    <table class="cir-val"><colgroup><col style="width:40%"><col style="width:20%"><col></colgroup>
+      <tr><th>VALOR BRUTO</th><th>ALÍQUOTA</th><th>RETENÇÃO IR</th></tr>
+      <tr><td>${m(d.valor)}</td><td style="text-align:center;">${fmtPct(d.pct||0)}%</td><td>${m(d.ir)}</td></tr>
+      <tr class="liq"><td colspan="3">VALOR LÍQUIDO</td></tr>
+      <tr class="liq"><td colspan="3" style="font-size:13px;">R$ &nbsp; ${fmtNumBR(d.liq||0)}</td></tr></table>
+    <div class="cir-ass"><div class="ln"></div>Assinatura</div>
+    <div class="cir-rod"><span>${d.cod?'Natureza / cód. receita: '+esc(d.cod):''}</span><span>${esc((STATE.entidade.secretaria||'')||'')}</span></div>
+  </div>`;
+}
+function cirFolhasHTML(itens){
+  const folhas = [];
+  for(let i=0; i<itens.length; i+=3){
+    const g = itens.slice(i, i+3);
+    folhas.push(`<div class="cir-folha">${g.map((d,j)=>`${j?'<div class="cir-corte"><span>✂ recorte aqui</span></div>':''}<div class="cir-slot">${carimboIRHTML(d)}</div>`).join('')}</div>`);
+  }
+  return folhas;
+}
+function imprimirCarimbosIR(itens){
+  itens = itens || cirItensImpressao();
+  if(!itens.length){ showToast('Nenhum carimbo marcado para imprimir.','warning'); return; }
+  const w = window.open('', '_blank');
+  if(!w){ showToast('O navegador bloqueou a janela de impressão. Libere os pop-ups deste site.','warning'); return; }
+  const folhas = cirFolhasHTML(itens).map((f,i,a)=>`<div class="pg" style="${i<a.length-1?'page-break-after:always;':''}">${f}</div>`).join('');
+  w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Carimbo de retenção IR</title><style>${cssDaPagina()}
+    @page{size:A4 portrait;margin:8mm;} html,body{background:#fff;margin:0;} body *{visibility:visible !important;}
+    .pg{width:194mm;margin:0 auto;} .cir,.cir *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    @media screen{ body{background:#e9eef1;padding:20px 0;} .pg{background:#fff;padding:8mm;box-sizing:content-box;margin:0 auto 20px;box-shadow:0 2px 10px rgba(0,0,0,.15);} }
+  </style></head><body>${folhas}<script>window.onload=function(){setTimeout(function(){window.print();},300);};<\/script></body></html>`);
+  w.document.close();
+  registrarAcao('Imprimiu '+itens.length+' carimbo(s) de retenção IR');
+}
+function cirImprimirUm(id){ const x = carIRNotas().find(y=>y.n.id===id); if(x) imprimirCarimbosIR([cirDadosNota(x)]); }
+// consulta o Simples dos fornecedores das notas do período que ainda não foram consultados hoje
+async function cirConsultarSimples(forcar, silencioso){
+  const C = carIREstado(); if(C.consultando) return;
+  const vistos = new Set(), alvo = [];
+  carIRNotas().forEach(x=>{ const c = x.t.c; if(c && !vistos.has(c.id) && soDigitos(c.documento).length===14 && (forcar || !consultaHoje(c))){ vistos.add(c.id); alvo.push(c); } });
+  if(!alvo.length){ if(!silencioso) showToast('Nenhum fornecedor com CNPJ para consultar (os já consultados hoje foram mantidos).','info'); return; }
+  C.consultando = true; render();
+  let ok = 0, falha = 0;
+  for(const c of alvo){ if(await consultarSimplesCredor(c, true)) ok++; else falha++; await new Promise(r=>setTimeout(r, 350)); }
+  C.consultando = false; saveState(); registrarAcao(`Consultou o Simples Nacional de ${ok} fornecedor(es) (carimbo de retenção IR)`); render();
+  if(!silencioso || falha) showToast(`Simples Nacional consultado: ${ok} fornecedor(es)${falha?' — '+falha+' sem resposta':''}.`, falha?'warning':'success');
+}
+function cirMarcarSimples(credorId, v){
+  if(semPermissao('credores')) return;
+  const c = getCredor(credorId); if(!c) return;
+  c.simplesOptante = v==='S'; c.simplesMei = false; c.simplesManual = true; c.simplesDataOpcao = ''; c.simplesDataExclusao = '';
+  c.simplesConsultaEm = new Date().toISOString(); c.simplesFonte = 'Marcado à mão por '+relNotasConferente(); c.simplesErro = '';
+  saveState(); registrarAcao(`Simples Nacional marcado à mão: ${c.nome} — ${v==='S'?'optante':'não optante'}`); render();
+}
+function cirAddAvulso(){
+  const v = r2(parseNumBR(valCampo('cira_valor'))||0), cod = valCampo('cira_cod') || RET_PADRAO, nat = retNatureza(cod);
+  const nf = valCampo('cira_nf'), cred = valCampo('cira_credor');
+  if(!nf || !cred || !(v>0)){ showToast('Informe NF, credor e valor do carimbo avulso.','warning'); return; }
+  const c = STATE.credores.find(x=>normTxt(x.nome)===normTxt(cred));
+  const ir = r2(v*nat.ir/100);
+  carIREstado().avulsos.push({ id:uid(), avulso:true, nf, emissao:valCampo('cira_emissao'), credor:c?c.nome:cred, doc:soDigitos(c&&c.documento), valor:v, pct:nat.ir, ir, liq:r2(v-ir), cod:nat.cod, ordenamento:'' });
+  render(); showToast('Carimbo avulso incluído na impressão (não fica gravado).');
+}
+function cirSalvarTextos(){
+  if(semPermissao('listas')) return;
+  STATE.carimboIR = { titulo: valCampo('cirt_titulo')||CIR_PADRAO.titulo, linha1: valCampo('cirt_linha1'), linha2: valCampo('cirt_linha2') };
+  saveState(); registrarAcao('Alterou os textos do carimbo de retenção IR'); carIR.verTextos = false; render(); showToast('Textos do carimbo salvos.','success');
+}
+function viewCarimboIR(){
+  const C = carIREstado(), notas = carIRNotas();
+  const nao = notas.filter(x=>x.t.simples==='N'), pend = notas.filter(x=>x.t.simples==='?'), opt = notas.filter(x=>x.t.simples==='S' || x.t.simples==='PF');
+  const marc = nao.filter(x=>!C.fora[x.n.id]), itens = cirItensImpressao();
+  const totIR = r2(itens.reduce((s,d)=>s+(d.ir||0),0)), totV = r2(itens.reduce((s,d)=>s+(d.valor||0),0));
+  const chave = [C.campoData,C.de,C.ate,notas.length].join('|');
+  if(C.autoFeito!==chave && !C.consultando){ C.autoFeito = chave; setTimeout(()=>cirConsultarSimples(false, true), 60); }
+  const T = cirTextos(), folhas = cirFolhasHTML(itens.slice(0,3));
+  const natSel = x=>`<select style="max-width:130px" title="Natureza desta nota (padrão: a do fornecedor)" onchange="if(this.value) relNotas.nat['${x.n.id}']=this.value; else delete relNotas.nat['${x.n.id}']; render()"><option value="">${x.t.c&&x.t.c.retCodigo?x.t.c.retCodigo:RET_PADRAO} (fornecedor)</option>${retTabela().map(q=>`<option value="${q.cod}" ${relNotas.nat[x.n.id]===q.cod?'selected':''}>${q.cod} — IR ${fmtPct(q.ir)}%</option>`).join('')}</select>`;
+  const pendCred = []; const vistos = new Set();
+  pend.forEach(x=>{ const k = x.t.c ? x.t.c.id : 'n:'+normTxt(x.n.credor||''); if(vistos.has(k)) return; vistos.add(k); pendCred.push(x); });
+  return `<div class="card no-print">
+    <h2>🧾 Carimbo de retenção do Imposto de Renda (IRRF)</h2>
+    <div class="subtitle">Um carimbo para cada nota de fornecedor <b>não optante</b> pelo Simples Nacional, no modelo da planilha “Carimbo Retenção IR”: <b>3 carimbos por folha A4</b>, separados por linha pontilhada para destacar. Cada carimbo traz o nº da NF e o credor. A alíquota é a do IR da natureza do fornecedor (Tabela de retenção em Listas de opções) — a mesma da Relação de notas ordenadas.</div>
+    <div class="filtros" style="margin-top:10px;">
+      <div class="field"><label>Data considerada</label><select onchange="carIR.campoData=this.value;render()"><option value="data" ${C.campoData!=='emissao'?'selected':''}>Data do ordenamento</option><option value="emissao" ${C.campoData==='emissao'?'selected':''}>Data de emissão da NF</option></select></div>
+      <div class="field"><label>Período inicial</label><input type="date" value="${esc(C.de)}" onchange="carIR.de=this.value;render()"></div>
+      <div class="field"><label>Período final</label><input type="date" value="${esc(C.ate)}" onchange="carIR.ate=this.value;render()"></div>
+      <div class="field busca"><label>Buscar</label><input value="${esc(C.busca)}" placeholder="NF, credor, nº do ordenamento…" onkeydown="if(event.key==='Enter'){carIR.busca=this.value;render();}" onblur="if(this.value!==carIR.busca){carIR.busca=this.value;render();}"></div>
+    </div>
+    <div class="actions">
+      <button class="btn" ${C.consultando||!itens.length?'disabled':''} onclick="imprimirCarimbosIR()">🖨️ Imprimir carimbos (${itens.length})</button>
+      <button class="btn secondary" ${C.consultando?'disabled':''} onclick="cirConsultarSimples(true)">🔄 Consultar Simples Nacional</button>
+      <button class="btn ghost small" onclick="carIR.fora={};render()">Marcar todos</button><button class="btn ghost small" onclick="carIRNotas().forEach(x=>carIR.fora[x.n.id]=1);render()">Desmarcar todos</button>
+      <span class="small-txt">${itens.length} carimbo(s) = ${Math.ceil(itens.length/3)||0} folha(s) · valor bruto ${fmtMoney(totV)} · IR retido <b>${fmtMoney(totIR)}</b>${C.consultando?' · ⏳ consultando o Simples Nacional…':''}</span>
+    </div>
+    ${pendCred.length?`<div class="alerta-aviso" style="margin-top:10px;">⚠️ <b>${pend.length} nota(s) sem situação no Simples Nacional</b> — só entram aqui depois de definida. ${pendCred.map(x=>`<div style="margin-top:4px;">• ${esc(x.n.credor||x.n.modeloRotulo||'(sem credor)')} <span class="small-txt">(${esc(x.t.pend||'')})</span> ${x.t.c?`<button class="btn ghost small" onclick="cirMarcarSimples('${x.t.c.id}','N')">Marcar NÃO optante</button><button class="btn ghost small" onclick="cirMarcarSimples('${x.t.c.id}','S')">Marcar optante</button>`:'<span class="small-txt">— cadastre o credor em Cadastros → Credores</span>'}</div>`).join('')}
+      <div class="small-txt" style="margin-top:4px;">Para consultar pela Receita, cadastre o CNPJ do fornecedor (Credores ou aba Relação de notas ordenadas).</div></div>`:''}
+    <div class="table-wrap" style="margin-top:10px;max-height:380px;"><table>
+      <thead><tr><th></th><th>Emissão</th><th>NF</th><th>Credor</th><th>Nº ordenamento</th><th class="num">Valor bruto</th><th>Natureza</th><th class="num">Alíquota</th><th class="num">Retenção IR</th><th class="num">Líquido</th><th></th></tr></thead>
+      <tbody>${nao.map(x=>{ const n = x.n, t = x.t; return `<tr style="${C.fora[n.id]?'opacity:.45':''}"><td><input type="checkbox" ${C.fora[n.id]?'':'checked'} onchange="if(this.checked) delete carIR.fora['${n.id}']; else carIR.fora['${n.id}']=1; render()"></td>
+        <td class="nowrap">${n.emissao?fmtDateBR(n.emissao):'—'}</td><td><b>${esc(n.nf||'')}</b></td><td class="trunc">${esc(n.credor||n.modeloRotulo||'')}</td><td class="nowrap">${numeroOrdenamento(n)}</td>
+        <td class="num nowrap">${fmtMoney(t.valor)}</td><td>${natSel(x)}</td><td class="num">${fmtPct(t.pct)}%</td><td class="num nowrap"><b>${fmtMoney(t.desc)}</b></td><td class="num nowrap">${fmtMoney(t.liq)}</td>
+        <td><button class="btn ghost small" title="Imprimir só este carimbo" onclick="cirImprimirUm('${n.id}')">🖨️</button></td></tr>`; }).join('') || `<tr class="empty-row"><td colspan="11">Nenhuma nota de fornecedor não optante no período.</td></tr>`}
+      ${C.avulsos.map((a,i)=>`<tr style="background:#F7F2FB;"><td><input type="checkbox" ${a.ativo===false?'':'checked'} onchange="carIR.avulsos[${i}].ativo=this.checked;render()"></td><td>${a.emissao?fmtDateBR(a.emissao):'—'}</td><td><b>${esc(a.nf)}</b></td><td class="trunc">${esc(a.credor)} <span class="badge neutro">avulso</span></td><td>—</td><td class="num">${fmtMoney(a.valor)}</td><td>${esc(a.cod)}</td><td class="num">${fmtPct(a.pct)}%</td><td class="num"><b>${fmtMoney(a.ir)}</b></td><td class="num">${fmtMoney(a.liq)}</td><td><button class="btn ghost small" title="Tirar" onclick="carIR.avulsos.splice(${i},1);render()">✕</button></td></tr>`).join('')}</tbody></table></div>
+    ${opt.length?`<div class="small-txt" style="margin-top:6px;">${opt.length} nota(s) de optantes pelo Simples ou pessoa física no período não precisam de carimbo de retenção.</div>`:''}
+    <details style="margin-top:12px;"><summary style="cursor:pointer;font-weight:700;font-size:13px;">＋ Carimbo avulso (nota que não está no sistema)</summary>
+      ${datalistHTML('dl_credores_ir', STATE.credores.filter(c=>c.ativo!==false).map(c=>c.nome))}
+      <div class="formgrid" style="margin-top:8px;">
+        <div class="field"><label>Nº da NF</label><input id="cira_nf"></div>
+        <div class="field"><label>Emissão</label><input id="cira_emissao" type="date"></div>
+        <div class="field half"><label>Credor</label><input id="cira_credor" list="dl_credores_ir"></div>
+        <div class="field"><label>Valor bruto (R$)</label><input id="cira_valor" class="valor" placeholder="0,00" onblur="formatarValorCampo(this)"></div>
+        <div class="field half"><label>Natureza / alíquota</label><select id="cira_cod">${retTabela().map(q=>`<option value="${q.cod}" ${q.cod===RET_PADRAO?'selected':''}>${q.cod} — IR ${fmtPct(q.ir)}% — ${esc(String(q.rot||'').slice(0,60))}</option>`).join('')}</select></div>
+      </div>
+      <div class="actions" style="margin-top:8px;"><button class="btn small" onclick="cirAddAvulso()">＋ Incluir na impressão</button></div>
+    </details>
+    <details style="margin-top:8px;" ${C.verTextos?'open':''}><summary style="cursor:pointer;font-weight:700;font-size:13px;">✏️ Textos do cabeçalho do carimbo</summary>
+      <div class="formgrid" style="margin-top:8px;">
+        <div class="field wide"><label>Título</label><input id="cirt_titulo" value="${esc(T.titulo)}"></div>
+        <div class="field wide"><label>Linha 1</label><input id="cirt_linha1" value="${esc(T.linha1)}"></div>
+        <div class="field wide"><label>Linha 2</label><input id="cirt_linha2" value="${esc(T.linha2)}"></div>
+      </div>
+      <div class="actions edit-only" style="margin-top:8px;"><button class="btn small" onclick="cirSalvarTextos()">💾 Salvar textos</button><button class="btn ghost small" onclick="if(confirm('Voltar aos textos da planilha original?')){delete STATE.carimboIR;saveState();render();}">Voltar ao padrão</button></div>
+    </details>
+  </div>
+  <div class="card no-print"><div class="small-txt" style="margin-bottom:8px;">Prévia da 1ª folha${itens.length>3?` (de ${Math.ceil(itens.length/3)})`:''} — o brasão é o de Administração → Entidade e carimbo</div>
+    <div class="cir-prev">${folhas[0] || '<div class="muted" style="padding:20px;text-align:center;">Nenhum carimbo para mostrar.</div>'}</div></div>`;
 }
 function viewRelacaoNotas(){
   const R = relNotasEstado();

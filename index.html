@@ -523,8 +523,8 @@ function mostrarTelaRegras(){
    Criação: novembro/2026 (mês 1).
    ============================================================ */
 const APP_CRIACAO = { mes: 11, ano: 2026 };
-const APP_ALTERACAO = 5;
-const APP_DATA = '2026-11-05';
+const APP_ALTERACAO = 6;
+const APP_DATA = '2026-11-06';
 function appVersao(){
   const p = APP_DATA.split('-').map(Number);
   const seqMes = (p[0] - APP_CRIACAO.ano)*12 + (p[1] - APP_CRIACAO.mes) + 1;
@@ -2511,22 +2511,43 @@ async function exportarRelacaoNotasExcel(){
    anexado ao recurso (guardado em partes no Firestore).
    Recurso ganha só campos novos: emendaNum, emendaVinculos[], anexos[].
    ============================================================ */
-let PORTARIAS = null, portariasOrigem = '', portariasCarregando = false;
+let PORTARIAS = null, portariasOrigem = '', portariasPromessa = null;
 const DOE_API = 'https://do-api-web-search.doe.sp.gov.br/v2/';
-async function carregarPortarias(forcar){
-  if(PORTARIAS && !forcar) return PORTARIAS;
-  if(portariasCarregando) return PORTARIAS;
-  portariasCarregando = true;
-  let site = null;
-  try{ const r = await fetch('portarias.json?t='+Date.now(), { cache:'no-store' }); if(r.ok) site = await r.json(); }catch(e){}
-  const emb = window.PORTARIAS_SNAPSHOT || null;
-  if(site && (!emb || String(site.geradoEm||'') >= String(emb.geradoEm||''))){ PORTARIAS = site; portariasOrigem = 'arquivo portarias.json do site'; }
-  else if(emb){ PORTARIAS = emb; portariasOrigem = 'cópia embutida no aplicativo'; }
-  else { PORTARIAS = { geradoEm:'', federal:[], estadual:[] }; portariasOrigem = ''; }
-  portariasCarregando = false;
+/* CORREÇÃO 06/11/2026 (travamento da aba "Emendas e portarias"):
+   antes, enquanto o portarias.json era baixado, cada chamada a portariasDados()
+   recebia uma promessa JÁ resolvida e agendava outro render(); cada render chamava
+   portariasDados() de novo (uma vez por recurso de emenda) e o ciclo nunca
+   terminava, a página congelava antes de o download sequer concluir.
+   Agora: (1) quem chama durante o download recebe a MESMA promessa pendente;
+   (2) portariasDados() usa na hora a cópia embutida e confere o portarias.json
+   do site uma única vez, em segundo plano, redesenhando só se vier algo mais novo. */
+function carregarPortarias(forcar){
+  if(PORTARIAS && !forcar) return Promise.resolve(PORTARIAS);
+  if(portariasPromessa) return portariasPromessa;
+  portariasPromessa = (async ()=>{
+    try{
+      let site = null;
+      try{ const r = await fetch('portarias.json?t='+Date.now(), { cache:'no-store' }); if(r.ok) site = await r.json(); }catch(e){}
+      if(site && (!Array.isArray(site.federal) || !Array.isArray(site.estadual))) site = null;
+      const emb = window.PORTARIAS_SNAPSHOT || null;
+      if(site && (!emb || String(site.geradoEm||'') >= String(emb.geradoEm||''))){ PORTARIAS = site; portariasOrigem = 'arquivo portarias.json do site'; }
+      else if(emb){ PORTARIAS = emb; portariasOrigem = 'cópia embutida no aplicativo'; }
+      else { PORTARIAS = { geradoEm:'', federal:[], estadual:[] }; portariasOrigem = ''; }
+      return PORTARIAS;
+    } finally { portariasPromessa = null; }
+  })();
+  return portariasPromessa;
+}
+function portariasDados(){
+  if(!PORTARIAS){
+    const emb = window.PORTARIAS_SNAPSHOT || null;
+    PORTARIAS = emb || { geradoEm:'', federal:[], estadual:[] };
+    portariasOrigem = emb ? 'cópia embutida no aplicativo' : '';
+    const antes = PORTARIAS;
+    carregarPortarias(true).then(p=>{ if(p!==antes && !recursoEditId) render(); }).catch(()=>{});
+  }
   return PORTARIAS;
 }
-function portariasDados(){ if(!PORTARIAS){ carregarPortarias().then(()=>render()); return { federal:[], estadual:[] }; } return PORTARIAS; }
 function lerPortariasArquivo(ev){
   const f = ev.target.files && ev.target.files[0]; if(!f) return;
   const fr = new FileReader();
@@ -2717,8 +2738,15 @@ function emendaCardHTML(r){
 /* ---- aba "Emendas e portarias": todas as emendas de Jaborandi, com o recurso de cada uma ---- */
 let filtroEmendas = { esfera:'', saude:true, busca:'' };
 function recursosDaEmenda(k){ return STATE.recursos.filter(r=>recursoEhEmenda(r) && emendasDoRecurso(r).some(x=>x.k===k)); }
+// índice emenda → recursos, montado uma vez por tela (antes era refeito para cada emenda da lista)
+function indiceRecursosPorEmenda(){
+  const m = new Map();
+  STATE.recursos.forEach(r=>{ if(!recursoEhEmenda(r)) return;
+    emendasDoRecurso(r).forEach(x=>{ if(!m.has(x.k)) m.set(x.k, []); m.get(x.k).push(r); }); });
+  return m;
+}
 function viewEmendasPortarias(){
-  const P = portariasDados(), F = filtroEmendas, termo = normTxt(F.busca);
+  const P = portariasDados(), F = filtroEmendas, termo = normTxt(F.busca), idxRec = indiceRecursosPorEmenda();
   let itens = [...P.federal.map(p=>({tipo:'F', it:p, k:chaveFed(p), ano:String(p.ano||'')})), ...P.estadual.map(e=>({tipo:'E', it:e, k:chaveEst(e), ano:String(e.ano||'')}))];
   if(F.esfera) itens = itens.filter(x=>x.tipo===F.esfera);
   if(F.saude) itens = itens.filter(x=>x.tipo==='F' || /sa[uú]de/i.test(x.it.orgao||''));
@@ -2736,7 +2764,7 @@ function viewEmendasPortarias(){
       <label class="btn ghost">📂 Abrir portarias.json<input type="file" accept=".json,application/json" style="display:none" onchange="lerPortariasArquivo(event)"></label>
     </div>
     <div class="small-txt" style="margin-top:6px;">${itens.length} emenda(s)</div>
-    ${itens.map(x=>{ const recs = recursosDaEmenda(x.k);
+    ${itens.map(x=>{ const recs = idxRec.get(x.k) || [];
       return documentoEmendaHTML({...x, como: recs.length ? 'recurso: '+recs.map(recursoCurto).join(', ') : 'sem recurso no app'}, null)
         .replace(/<\/div><\/div>$/, `${recs.map(r=>`<button class="btn ghost small" onclick="abrirRecurso('${r.id}')">💰 Abrir ${esc(recursoCurto(r))}</button>`).join('')}${recs.length?'':`<button class="btn ghost small edit-only" onclick="novoRecursoDaEmenda('${escJs(x.k)}')">＋ Cadastrar recurso desta emenda</button>`}</div></div>`); }).join('') || '<div class="helpbox">Nenhuma emenda para os filtros escolhidos.</div>'}
   </div>

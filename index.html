@@ -523,7 +523,7 @@ function mostrarTelaRegras(){
    Criação: novembro/2026 (mês 1).
    ============================================================ */
 const APP_CRIACAO = { mes: 11, ano: 2026 };
-const APP_ALTERACAO = 9;
+const APP_ALTERACAO = 10;
 const APP_DATA = '2026-11-06';
 function appVersao(){
   const p = APP_DATA.split('-').map(Number);
@@ -1358,7 +1358,13 @@ function viewOrdenar(){
     ${datalistHTML('dl_niveis', lista('niveis'))}${datalistHTML('dl_unidades', lista('unidades'))}${datalistHTML('dl_naturezas', lista('naturezas'))}
     ${datalistHTML('dl_fontes', lista('fontes'))}${datalistHTML('dl_transferencias', lista('transferencias'))}${datalistHTML('dl_modalidades', lista('modalidades'))}
     ${datalistHTML('dl_tiposCompra', lista('tiposCompra'))}${datalistHTML('dl_credores', STATE.credores.filter(c=>c.ativo!==false).map(c=>c.nome))}${datalistHTML('dl_item2', lista('textosItem2'))}
-    ${n.id?`<div class="alerta-aviso">Editando a ordenação <b>${numeroOrdenamento(n)}</b> (NF ${esc(n.nf)}). <a href="#" onclick="notaDraft=null;go('notas');return false;">Cancelar edição</a></div>`:''}
+    ${n.id?`<div class="alerta-aviso">Editando a ordenação <b>${numeroOrdenamento(n)}</b> (NF ${esc(n.nf)}). <a href="#" onclick="notaDraft=null;go('notas');return false;">Cancelar edição</a> · <a href="#" onclick="notaDraft=notaVazia();render();return false;">Nova ordenação</a></div>`:''}
+    <div class="card">
+      <h2>🔎 Buscar carimbo já ordenado</h2>
+      <div class="subtitle">Para abrir e alterar uma ordenação já feita. Busque pelo nº do ordenamento (ex.: 9/2026), nº da NF, credor, modelo, valor ou texto das observações.</div>
+      <div class="filtros"><div class="field busca"><input id="buscaOrdInp" placeholder="🔎 Nº do ordenamento, NF, credor, valor…" value="${esc(buscaOrdenados)}" oninput="buscaOrdenados=this.value;filtrarOrdenadosBusca()"></div></div>
+      <div id="resBuscaOrd">${ordenadosBuscaHTML()}</div>
+    </div>
     <div class="card">
       <div class="flexrow"><h2>1. Escolha o modelo do carimbo</h2><span class="small-txt">${STATE.modelos.filter(m=>m.ativo!==false).length} modelos ativos — ${n.modeloRotulo?`em uso: <b>${esc(n.modeloRotulo)}</b>`:'nenhum escolhido'}</span></div>
       <div class="subtitle">Cada modelo é uma aba da planilha antiga (credor ou convênio), já com modalidade, fonte, convênio, dados bancários e textos. Digite parte do nome para filtrar.</div>
@@ -1421,13 +1427,40 @@ function viewOrdenar(){
             <button class="btn verde" onclick="salvarNota(true)" ${pode?'':'disabled'}>💾🖨️ Salvar e imprimir carimbo</button>
             <button class="btn" onclick="salvarNota(false)" ${pode?'':'disabled'}>💾 Salvar</button>
             <button class="btn secondary" onclick="lerFormNota();imprimirCarimbos([Object.assign({},notaDraft)])">🖨️ Só imprimir (sem salvar)</button>
-            <button class="btn secondary" onclick="salvarNotaComoModelo()" ${pode?'':'disabled'}>🏷️ ${n.modeloId?'Atualizar o modelo com estes dados':'Guardar como novo modelo'}</button>
+            <button class="btn secondary" onclick="salvarNotaComoModelo()" ${pode?'':'disabled'}>🏷️ Guardar como modelo</button>
             <button class="btn ghost" onclick="if(confirm('Limpar o formulário?')){notaDraft=notaVazia();render();}">Limpar</button>
           </div>
         </div>
       </div>
       <div class="preview-box"><div class="small-txt" style="margin-bottom:6px;">Pré-visualização do carimbo (A4)</div><div id="previewNota"></div></div>
     </div>`;
+}
+/* ---- Busca de carimbos já ordenados (06/11/2026, 1.10): só leitura das notas gravadas;
+   "Editar" usa o editarNota de sempre. ---- */
+let buscaOrdenados = '';
+function ordenadosBuscaHTML(){
+  const t = normTxt(buscaOrdenados);
+  if(!t) return '';
+  const tNum = t.replace(/[^\d\/]/g,'');
+  const notas = movPorTipo('nota').filter(n=>!n.historico).filter(n=>{
+    const num = n.numero ? String(n.numero)+'/'+n.ano : '';
+    if(tNum && /^\d+(\/\d{4})?$/.test(tNum) && tNum===t){ // só números: nº do ordenamento ou NF ou valor
+      const [a,b] = tNum.split('/');
+      if(n.numero && Number(a)===Number(n.numero) && (!b || Number(b)===Number(n.ano))) return true;
+    }
+    return normTxt([numeroOrdenamento(n), num, n.nf, n.credor, n.modeloRotulo, fmtNumBR(n.valor||0), n.observacoes, n.convenio, n.programa, n.obsInterna].join(' ')).includes(t);
+  }).sort((a,b)=>(Number(b.ano)||0)-(Number(a.ano)||0) || (Number(b.numero)||0)-(Number(a.numero)||0) || String(b.data||'').localeCompare(a.data||''));
+  if(!notas.length) return '<div class="muted" style="padding:8px 2px;">Nenhum carimbo encontrado.</div>';
+  const pode = podeEditar('ordenar');
+  return `<div class="table-wrap" style="max-height:320px;margin-top:8px;"><table><thead><tr><th>Ordenamento</th><th>Data</th><th>NF</th><th>Credor / modelo</th><th class="num">Valor</th><th>Situação</th><th></th></tr></thead><tbody>
+    ${notas.slice(0,50).map(n=>`<tr ${notaDraft&&notaDraft.id===n.id?'style="background:#FFF7E0;"':''}><td class="nowrap"><b>${numeroOrdenamento(n)}</b></td><td class="nowrap">${n.data?fmtDateBR(n.data):'—'}</td><td>${esc(n.nf||'')}</td><td class="trunc">${esc(n.credor||n.modeloRotulo||'')}${n.credor&&n.modeloRotulo&&normTxt(n.credor)!==normTxt(n.modeloRotulo)?' <span class="small-txt">· '+esc(n.modeloRotulo)+'</span>':''}</td><td class="num nowrap">${fmtMoney(n.valor)}</td><td>${badgeSituacao(n.situacao)}</td>
+      <td class="nowrap"><button class="btn small" onclick="abrirOrdenadoBusca('${n.id}')">${pode?'✏️ Editar':'👁️ Abrir'}</button>${pode?`<button class="btn ghost small" title="Nova ordenação a partir desta (datas das observações +1 mês)" onclick="duplicarNota('${n.id}')">📄 Duplicar</button>`:''}</td></tr>`).join('')}
+    </tbody></table></div>${notas.length>50?`<div class="small-txt" style="margin-top:4px;">Mostrando 50 de ${notas.length}. Refine a busca.</div>`:`<div class="small-txt" style="margin-top:4px;">${notas.length} carimbo(s).</div>`}`;
+}
+function filtrarOrdenadosBusca(){ const d = document.getElementById('resBuscaOrd'); if(d) d.innerHTML = ordenadosBuscaHTML(); }
+function abrirOrdenadoBusca(id){
+  if(notaDraft && !notaDraft.id && (notaDraft.nf || Number(notaDraft.valor)) && !confirm('A nota que está na tela ainda não foi salva. Abrir o carimbo escolhido mesmo assim?')) return;
+  editarNota(id); window.scrollTo(0,0); showToast('Carimbo '+numeroOrdenamento(notaDraft)+' aberto para alteração. Depois de mudar, clique em Salvar.');
 }
 function modelosGradeHTML(modelos, sel){
   return modelos.map(m=>{ const r = getRecurso(m.recursoId); return `<div class="modelo-item ${m.id===sel?'sel':''}" onclick="escolherModeloOrdenar('${m.id}')"><b>${esc(m.rotulo)}</b>${m.ativo===false?' <span class="badge inativo">inativo</span>':''}<div class="small-txt">${esc([m.fonte, m.natureza].filter(Boolean).join(' · '))}${r?' · '+esc(r.ficha||''):''}</div><div class="small-txt">${esc((m.convenio||m.programa||'').slice(0,70))}</div></div>`; }).join('') || '<div class="muted" style="padding:10px;">Nenhum modelo encontrado.</div>';
@@ -1475,19 +1508,51 @@ function salvarNota(imprimir){
   if(novo){ notaDraft = notaVazia(); buscaModelo = ''; render(); }
   else go('notas');
 }
+/* 06/11/2026 (1.10): um credor pode ter mais de um modelo. Se já houver modelo(s) do
+   credor (ou o modelo em uso), pergunta se substitui um deles ou cria um novo. */
+function modelosDoCredorNota(n){
+  const cred = normTxt(n.credor||'');
+  return STATE.modelos.filter(m=>m.id===n.modeloId || (m.ativo!==false && cred && ((n.credorId && m.credorId===n.credorId) || normTxt(m.credor||'')===cred)))
+    .sort((a,b)=>(a.id===n.modeloId?-1:b.id===n.modeloId?1:0) || (a.rotulo||'').localeCompare(b.rotulo||''));
+}
 function salvarNotaComoModelo(){
   if(semPermissao('modelos')) return;
   lerFormNota();
   const n = notaDraft;
-  let m = getModelo(n.modeloId);
-  if(m){
-    if(!confirm(`Atualizar o modelo "${m.rotulo}" com os campos do carimbo desta tela (modalidade, fonte, convênio, observações, banco…)?`)) return;
-  } else {
-    const rot = prompt('Nome do novo modelo (ex.: nome do credor ou do convênio):', n.credor || '');
-    if(!rot) return;
-    m = { id: uid(), rotulo: rot.trim(), ativo:true, criadoEm:new Date().toISOString() };
-    STATE.modelos.push(m);
-  }
+  const exist = modelosDoCredorNota(n);
+  if(!exist.length){ salvarModeloNovoDaNota(); return; }
+  abrirModal(`<h2>🏷️ Guardar modelo de carimbo</h2>
+    <div class="subtitle">${n.credor?`O credor <b>${esc(n.credor)}</b> já tem ${exist.length===1?'um modelo salvo':exist.length+' modelos salvos'}.`:'Esta nota já usa um modelo.'} Deseja substituir um modelo existente ou salvar um novo modelo${n.credor?' para esse credor':''}?</div>
+    <div style="margin:12px 0;display:flex;flex-direction:column;gap:6px;max-height:260px;overflow:auto;">
+      ${exist.map((m,i)=>`<label style="display:flex;gap:8px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line);border-radius:8px;cursor:pointer;"><input type="radio" name="modSubst" value="${m.id}" ${i===0?'checked':''} style="margin-top:3px;"><span><b>${esc(m.rotulo)}</b>${m.id===n.modeloId?' <span class="badge azul">em uso nesta nota</span>':''}${m.ativo===false?' <span class="badge inativo">inativo</span>':''}<br><span class="small-txt">${esc([m.fonte, m.natureza, (m.convenio||m.programa||'').slice(0,80)].filter(Boolean).join(' · '))}</span></span></label>`).join('')}
+    </div>
+    <div class="actions">
+      <button class="btn" onclick="const r=document.querySelector('input[name=modSubst]:checked');if(r){fecharModal();substituirModeloDaNota(r.value);}">♻️ Substituir o modelo marcado</button>
+      <button class="btn verde" onclick="fecharModal();salvarModeloNovoDaNota()">＋ Salvar como novo modelo</button>
+      <button class="btn ghost" onclick="fecharModal()">Cancelar</button>
+    </div>`);
+}
+function salvarModeloNovoDaNota(){
+  if(semPermissao('modelos')) return;
+  lerFormNota(); const n = notaDraft;
+  const base = (n.credor || n.modeloRotulo || '').trim();
+  let sug = base, k = 2; while(sug && STATE.modelos.some(m=>normTxt(m.rotulo)===normTxt(sug))) sug = base+' ('+(k++)+')';
+  const rot = prompt('Nome do novo modelo (ex.: nome do credor + o serviço ou o convênio):', sug);
+  if(!rot || !rot.trim()) return;
+  if(STATE.modelos.some(m=>normTxt(m.rotulo)===normTxt(rot)) && !confirm('Já existe um modelo com o nome "'+rot.trim()+'". Criar outro com o mesmo nome assim mesmo?')) return;
+  const m = { id: uid(), rotulo: rot.trim(), ativo:true, criadoEm:new Date().toISOString() };
+  STATE.modelos.push(m);
+  gravarModeloDaNota(m);
+}
+function substituirModeloDaNota(id){
+  if(semPermissao('modelos')) return;
+  const m = getModelo(id); if(!m) return;
+  if(!confirm(`Substituir o modelo "${m.rotulo}" pelos campos do carimbo desta tela (modalidade, fonte, convênio, observações, banco…)?\nAs notas já ordenadas com ele não mudam.`)) return;
+  gravarModeloDaNota(m);
+}
+function gravarModeloDaNota(m){
+  lerFormNota();
+  const n = notaDraft;
   CAMPOS_CARIMBO.forEach(k=>{ m[k] = k==='modalidades' ? JSON.parse(JSON.stringify(n.modalidades||[])) : (n[k]||''); });
   m.credor = n.credor; m.credorId = n.credorId; m.recursoId = n.recursoId; m.contratoId = n.contratoId;
   n.modeloId = m.id; n.modeloRotulo = m.rotulo;

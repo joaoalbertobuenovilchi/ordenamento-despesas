@@ -523,7 +523,7 @@ function mostrarTelaRegras(){
    Criação: novembro/2026 (mês 1).
    ============================================================ */
 const APP_CRIACAO = { mes: 11, ano: 2026 };
-const APP_ALTERACAO = 6;
+const APP_ALTERACAO = 8;
 const APP_DATA = '2026-11-06';
 function appVersao(){
   const p = APP_DATA.split('-').map(Number);
@@ -976,6 +976,7 @@ function garantirEstrutura(){
   Object.keys(padraoEnt).forEach(k=>{ if(e[k]===undefined) e[k] = padraoEnt[k]; });
   if(!STATE.listas || typeof STATE.listas!=='object') STATE.listas = {};
   Object.keys(LISTAS_PADRAO).forEach(k=>{ if(!Array.isArray(STATE.listas[k])) STATE.listas[k] = LISTAS_PADRAO[k].slice(); });
+  if(!STATE.emailsDeptos || typeof STATE.emailsDeptos!=='object' || Array.isArray(STATE.emailsDeptos)) STATE.emailsDeptos = {};
   ['credores','modelos','recursos','contratos','shards','exercicios'].forEach(k=>{ if(!Array.isArray(STATE[k])) STATE[k] = []; });
   if(!STATE.seq || typeof STATE.seq!=='object') STATE.seq = {};
   const anoAtual = new Date().getFullYear();
@@ -984,7 +985,9 @@ function garantirEstrutura(){
   STATE.exercicios.sort();
   STATE.modelos.forEach(m=>{ if(!Array.isArray(m.modalidades)) m.modalidades = []; if(m.ativo===undefined) m.ativo = true; });
   STATE.recursos.forEach(r=>{ if(r.ativo===undefined) r.ativo = true; });
-  STATE.credores.forEach(c=>{ if(c.ativo===undefined) c.ativo = true; });
+  STATE.credores.forEach(c=>{ if(c.ativo===undefined) c.ativo = true;
+    // CPF/CNPJ já gravados sem pontuação passam a ficar no padrão (mesmos dígitos)
+    const d = String(c.documento||'').replace(/\D/g,''); if((d.length===11 || d.length===14) && c.documento!==fmtCNPJ(d)) c.documento = fmtCNPJ(d); });
 }
 function lista(k){ return (STATE.listas && STATE.listas[k]) || LISTAS_PADRAO[k] || []; }
 function datalistHTML(id, itens){ return `<datalist id="${id}">${(itens||[]).map(v=>`<option value="${esc(v)}">`).join('')}</datalist>`; }
@@ -2227,6 +2230,45 @@ function cnpjValido(d){
   const calc = n=>{ let s = 0, p = n-7; for(let i=0;i<n;i++){ s += Number(d[i])*p--; if(p<2) p = 9; } const r = s%11; return r<2 ? 0 : 11-r; };
   return calc(12)===Number(d[12]) && calc(13)===Number(d[13]);
 }
+/* ---- CPF e CNPJ no padrão (06/11/2026). Todo campo <input data-doc> é formatado enquanto se
+   digita ou cola: até 11 dígitos segue o CPF (000.000.000-00) e a partir do 12º vira CNPJ
+   (00.000.000/0000-00). data-doc="cpf" ou "cnpj" aceita só aquele tipo. Ao sair do campo,
+   CPF/CNPJ com dígito verificador errado fica com a borda vermelha. ---- */
+function cpfValido(d){
+  d = soDigitos(d); if(d.length!==11 || /^(\d)\1+$/.test(d)) return false;
+  const calc = n=>{ let s = 0; for(let i=0;i<n;i++) s += Number(d[i])*(n+1-i); const r = (s*10)%11; return r===10 ? 0 : r; };
+  return calc(9)===Number(d[9]) && calc(10)===Number(d[10]);
+}
+function docValido(d){ d = soDigitos(d); return d.length===11 ? cpfValido(d) : d.length===14 ? cnpjValido(d) : false; }
+function fmtDocExib(v){ const d = soDigitos(v); return d.length===11 || d.length===14 ? fmtCNPJ(d) : String(v||''); }
+function fmtDocParcial(v, tipo){
+  const d = soDigitos(v).slice(0, tipo==='cpf' ? 11 : 14);
+  const seps = (tipo==='cnpj' || d.length>11) ? {2:'.',5:'.',8:'/',12:'-'} : {3:'.',6:'.',9:'-'};
+  let out = ''; for(let i=0;i<d.length;i++) out += (seps[i]||'') + d[i];
+  return out;
+}
+function mascararDocCampo(el){
+  const antes = el.value, pos = el.selectionStart==null ? antes.length : el.selectionStart;
+  const novo = fmtDocParcial(antes, el.dataset.doc||''); if(novo===antes) return;
+  const digAntes = soDigitos(antes.slice(0, pos)).length;
+  el.value = novo;
+  let p = 0, n = 0; while(p<novo.length && n<digAntes){ if(/\d/.test(novo[p])) n++; p++; }
+  try{ el.setSelectionRange(p, p); }catch(e){}
+}
+function conferirDocCampo(el){
+  const d = soDigitos(el.value), tipo = el.dataset.doc||'';
+  let msg = '';
+  if(d){
+    if(tipo==='cpf' && d.length!==11) msg = 'O CPF tem 11 dígitos.';
+    else if(tipo==='cnpj' && d.length!==14) msg = 'O CNPJ tem 14 dígitos.';
+    else if(d.length!==11 && d.length!==14) msg = 'CPF tem 11 dígitos e CNPJ tem 14.';
+    else if(!docValido(d)) msg = (d.length===11?'CPF':'CNPJ')+' com dígito verificador inválido. Confira o número.';
+  }
+  el.style.borderColor = msg ? 'var(--red)' : ''; el.title = msg;
+  return !msg;
+}
+document.addEventListener('input', ev=>{ const el = ev.target; if(el && el.matches && el.matches('input[data-doc]')) mascararDocCampo(el); }, true);
+document.addEventListener('focusout', ev=>{ const el = ev.target; if(el && el.matches && el.matches('input[data-doc]')) conferirDocCampo(el); }, true);
 function credorDaNota(n){
   return getCredor(n.credorId) || STATE.credores.find(c=>normTxt(c.nome)===normTxt(n.credor||n.modeloRotulo||'')) || null;
 }
@@ -2328,6 +2370,7 @@ function relSalvarCNPJ(i, valor){
   const d = soDigitos(valor);
   if(d && d.length!==14 && d.length!==11){ showToast('CNPJ deve ter 14 dígitos (ou CPF 11).','warning'); render(); return; }
   if(d.length===14 && !cnpjValido(d) && !confirm('O CNPJ '+fmtCNPJ(d)+' não confere nos dígitos verificadores. Gravar assim mesmo?')){ render(); return; }
+  if(d.length===11 && !cpfValido(d) && !confirm('O CPF '+fmtCNPJ(d)+' não confere nos dígitos verificadores. Gravar assim mesmo?')){ render(); return; }
   if(semPermissao('credores')){ render(); return; }
   let c = f.c;
   if(!c){ c = { id: uid(), nome: f.nome, documento:'', banco:'', agencia:'', conta:'', pix:'', obs:'', ativo:true, criadoEm:new Date().toISOString() }; STATE.credores.push(c); }
@@ -2366,7 +2409,7 @@ function relFornecedoresHTML(){
       <thead><tr><th>Fornecedor</th><th>CNPJ</th><th>Simples Nacional</th><th>Natureza (IR descontado se não optante)</th><th class="num">Notas</th><th></th></tr></thead>
       <tbody>${fs.map((f,i)=>{ const c = f.c, doc = soDigitos(c&&c.documento), st = doc.length===11 ? 'PF' : simplesNaData(c, ''), nat = retNatureza(c&&c.retCodigo);
         return `<tr><td class="trunc"><b>${esc(f.nome)}</b>${c?'':' <span class="small-txt">(não está em Credores — será cadastrado ao gravar o CNPJ)</span>'}${c&&c.simplesRazao&&normTxt(c.simplesRazao)!==normTxt(c.nome)?`<div class="small-txt">Receita: ${esc(c.simplesRazao)}</div>`:''}</td>
-        <td class="nowrap"><input style="width:150px" value="${esc(doc?fmtCNPJ(doc):'')}" placeholder="00.000.000/0000-00" ${pode?'':'disabled'} onchange="relSalvarCNPJ(${i}, this.value)"></td>
+        <td class="nowrap"><input style="width:150px" data-doc inputmode="numeric" autocomplete="off" value="${esc(doc?fmtCNPJ(doc):'')}" placeholder="00.000.000/0000-00" ${pode?'':'disabled'} onchange="relSalvarCNPJ(${i}, this.value)"></td>
         <td>${badgeSimples(st)}<div class="small-txt">${esc(simplesResumoCredor(c))}${c&&c.simplesErro?`<span style="color:var(--danger,#b00)"> · ${esc(c.simplesErro)}</span>`:''}</div></td>
         <td>${c&&doc.length===14?`<select style="max-width:260px" title="${esc(nat.rot)}" onchange="relSalvarNatureza(${i}, this.value)">${retTabela().map(r=>`<option value="${r.cod}" ${nat.cod===r.cod?'selected':''}>${r.cod} — IR ${fmtPct(r.ir)}% — ${esc(r.rot.slice(0,48))}…</option>`).join('')}</select>`:'<span class="small-txt">—</span>'}</td>
         <td class="num">${f.notas.length} · ${fmtMoney(f.total)}</td>
@@ -2435,7 +2478,8 @@ function viewRelacaoNotas(){
       <div class="field"><label>Conferido</label><input value="${esc(relNotasConferente())}" disabled></div>
       <div class="field"><label>Desconto (não optantes)</label><select onchange="relNotas.descontar=this.value==='1';try{localStorage.setItem(LOCAL_PREFIXO+'relDescontar',this.value)}catch(e){};render()"><option value="1" ${R.descontar?'selected':''}>Descontar IR (não optantes)</option><option value="0" ${R.descontar?'':'selected'}>Não aplicar — valor da NF</option></select></div>
     </div>
-    <div class="actions"><button class="btn" ${R.consultando?'disabled':''} onclick="imprimirRelacaoNotas()">🖨️ Imprimir relação</button><button class="btn secondary" ${R.consultando?'disabled':''} onclick="exportarRelacaoNotasExcel()">⭳ Excel</button>
+    ${R.departamento?`<div class="small-txt" style="margin:-2px 0 8px;">📧 E-mails do departamento ${esc(R.departamento)}: ${emailsDepto(R.departamento).length?`<b>${emailsDepto(R.departamento).map(esc).join(', ')}</b>`:'<b style="color:#8a5a1c">nenhum cadastrado</b>'} <a href="#" onclick="go('listas');return false;">(cadastrar/alterar em Listas de opções)</a></div>`:''}
+    <div class="actions"><button class="btn" ${R.consultando?'disabled':''} onclick="imprimirRelacaoNotas()">🖨️ Imprimir relação</button><button class="btn secondary" ${R.consultando?'disabled':''} onclick="enviarRelacaoEmail()">📧 Enviar por e-mail</button><button class="btn secondary" ${R.consultando?'disabled':''} onclick="exportarRelacaoNotasExcel()">⭳ Excel</button>
       <span class="small-txt">${itens.length} de ${todas.length} nota(s) selecionada(s) · ${fmtMoney(itens.reduce((s,x)=>s+(Number(x.n.valor)||0),0))}${R.descontar?` · IR retido ${fmtMoney(totDesc)} · líquido <b>${fmtMoney(totLiq)}</b>`:''}${R.consultando?' · ⏳ consultando o Simples Nacional…':''}</span>
       ${todas.length?`<button class="btn ghost small" onclick="relNotas.fora={};render()">Marcar todas</button><button class="btn ghost small" onclick="relNotasLista().forEach(x=>relNotas.fora[x.n.id]=1);render()">Desmarcar todas</button>`:''}</div>
     <div class="table-wrap" style="margin-top:10px;max-height:380px;"><table>
@@ -2472,6 +2516,89 @@ async function imprimirRelacaoNotas(){
   el.innerHTML = relNotasDocHTML(itens);
   registrarAcao('Imprimiu relação de notas ordenadas ('+(R.departamento||'sem departamento')+')'+(R.descontar?' com desconto dos não optantes do Simples':''));
   el.classList.add('print-target'); window.print(); setTimeout(()=>el.classList.remove('print-target'), 500);
+  // depois de imprimir: busca os e-mails do departamento e pergunta se deseja enviar
+  if(R.departamento) setTimeout(()=>perguntarEnvioRelacao(itens, true), 650);
+}
+
+/* ---- Envio da relação por e-mail (06/11/2026). Mesmo mecanismo do Controle de Exames:
+   o aplicativo roda só no navegador (sem servidor de e-mail), então abre o Gmail numa
+   nova aba já com destinatários, assunto e a relação no corpo. Se a relação for longa
+   demais para caber no endereço do Gmail, o corpo leva o resumo e a tabela completa
+   vai para a área de transferência (Ctrl+V no e-mail). ---- */
+let relEnvio = null;
+const LIMITE_URL_GMAIL = 7500, LIMITE_URL_MAILTO = 1900;
+async function enviarRelacaoEmail(){
+  const R = relNotasEstado();
+  if(!R.departamento){ showToast('Escolha o departamento em “Enviar para”.','warning'); return; }
+  const itens = await relPrepararGeracao(); if(!itens) return;
+  perguntarEnvioRelacao(itens, false);
+}
+function perguntarEnvioRelacao(itens, aposImprimir){
+  const R = relNotasEstado(), dep = R.departamento; if(!dep) return;
+  const emails = emailsDepto(dep);
+  if(!emails.length){
+    abrirModal(`<h3>📧 Enviar a relação por e-mail</h3>
+      <div class="helpbox">O departamento <b>${esc(dep)}</b> ainda não tem e-mail cadastrado, então a relação não pode ser enviada por e-mail.</div>
+      <div class="actions" style="margin-top:14px;"><button class="btn" onclick="fecharModal();go('listas')">📧 Cadastrar e-mails do departamento</button><button class="btn secondary" onclick="fecharModal()">Agora não</button></div>`);
+    return;
+  }
+  relEnvio = { itens, dep };
+  const tot = r2(itens.reduce((s,x)=>s+retencaoItem(x).liq,0));
+  abrirModal(`<h3>📧 ${aposImprimir?'Relação impressa. ':''}Deseja enviar a relação por e-mail?</h3>
+    <div>Relação de notas ordenadas para o <b>Departamento de ${esc(dep)}</b>: ${itens.length} nota(s)${R.de||R.ate?`, emissão de ${R.de?fmtDateBR(R.de):'…'} a ${R.ate?fmtDateBR(R.ate):'…'}`:''}, ${R.descontar?'líquido':'total'} <b>${fmtMoney(tot)}</b>.</div>
+    <div style="margin-top:10px;"><b>Enviar para:</b>${emails.map(e=>`<label class="check" style="display:flex;gap:6px;align-items:center;margin-top:4px;"><input type="checkbox" class="relEnvioDest" value="${esc(e)}" checked> ${esc(e)}</label>`).join('')}</div>
+    <div class="small-txt" style="margin-top:10px;">O Gmail abre numa nova aba com os destinatários, o assunto e a relação já preenchidos. Confira e clique em <b>Enviar</b>.</div>
+    <div class="actions" style="margin-top:14px;"><button class="btn" onclick="confirmarEnvioRelacao(false)">✔ Sim, enviar</button><button class="btn secondary" onclick="relEnvio=null;fecharModal()">Não</button><button class="btn ghost small" onclick="confirmarEnvioRelacao(true)" title="Abre o programa de e-mail padrão do computador (Outlook etc.)">Usar outro programa de e-mail</button></div>`);
+}
+function relNotasEmailTexto(itens){
+  const R = relNotasEstado(), D = R.descontar, ent = STATE.entidade || {};
+  const agora = new Date(), quando = agora.toLocaleDateString('pt-BR')+' às '+pad2(agora.getHours())+':'+pad2(agora.getMinutes());
+  const periodo = R.de||R.ate ? `emissão de ${R.de?fmtDateBR(R.de):'…'} a ${R.ate?fmtDateBR(R.ate):'…'}` : 'todas as datas de emissão';
+  const rs = itens.map(x=>({ x, t: retencaoItem(x) }));
+  const tV = r2(rs.reduce((s,y)=>s+y.t.valor,0)), tD = r2(rs.reduce((s,y)=>s+y.t.desc,0)), tL = r2(rs.reduce((s,y)=>s+y.t.liq,0));
+  const simp = t=>t.simples==='S'?'SIM':t.simples==='N'?'NÃO':t.simples==='PF'?'PF':'?';
+  const forn = x=>(x.n.credor||x.n.modeloRotulo||'').toUpperCase();
+  const linhas = rs.map(({x,t},i)=>`${i+1}. NF ${x.n.nf||'s/n'} | emissão ${x.d?fmtDateBR(x.d):'sem data'}${x.n.emissao?'':' (data do ordenamento)'} | ${forn(x)} | valor ${fmtMoney(t.valor)}`
+    + (D ? ` | Simples: ${simp(t)}${t.pct?` | IR ${fmtPct(t.pct)}% (cód. ${t.cod}): ${fmtMoney(t.desc)}`:''} | líquido ${fmtMoney(t.liq)}` : ''));
+  const totalTxt = `TOTAL: ${itens.length} nota(s) | valor ${fmtMoney(tV)}`+(D?` | IR retido ${fmtMoney(tD)} | líquido ${fmtMoney(tL)}`:'');
+  const pend = D ? rs.filter(y=>y.t.pend).length : 0;
+  const obs = D ? ['Desconto: Imposto de Renda retido na fonte (IN RFB nº 1.234/2012, Anexo I) sobre as notas de fornecedores não optantes pelo Simples Nacional. Optantes mantêm o valor da nota.']
+      .concat(pend?[`Simples "?": ${pend} nota(s) sem consulta ao Simples Nacional, enviadas sem desconto.`]:[]) : [];
+  const assinatura = ['Conferido: '+relNotasConferente(), ent.secretaria||'', ent.prefeitura||''].filter(Boolean).join('\n');
+  const assunto = `Relação de notas fiscais ordenadas - Departamento de ${R.departamento} - ${periodo}`;
+  const abertura = `Prezados,\n\nEncaminhamos ao Departamento de ${R.departamento} a relação de notas fiscais ordenadas (${periodo}).\n\n${relNotasTitulo()}\nENCAMINHAR PARA: DEPARTAMENTO DE ${String(R.departamento).toUpperCase()}\nGerada em ${quando}`;
+  const corpo = `${abertura}\n\n${linhas.join('\n') || 'Nenhuma nota no período.'}\n\n${totalTxt}${obs.length?'\n\n'+obs.join('\n'):''}\n\n${assinatura}`;
+  const resumo = `${abertura}\n\n${totalTxt}\n\n[A relação completa foi copiada pelo aplicativo. Clique aqui e cole com Ctrl+V]\n${obs.length?'\n'+obs.join('\n')+'\n':''}\n${assinatura}`;
+  // versão formatada (tabela) para colar no e-mail quando o texto não couber no endereço
+  const td = 'border:1px solid #888;padding:3px 6px;font-size:12px;', tdv = td+'text-align:right;white-space:nowrap;';
+  const cab = (D?['NF Nº','Emissão','Fornecedor','Simples','Valor da NF','IR %','IR retido','Valor líquido']:['NF Nº','Emissão','Fornecedor','Valor']).map(h=>`<th style="${td}background:#eee;">${h}</th>`).join('');
+  const html = `<div style="font-family:Arial,sans-serif;font-size:13px;"><p><b>${esc(relNotasTitulo())}</b><br>Encaminhar para: <b>DEPARTAMENTO DE ${esc(String(R.departamento).toUpperCase())}</b><br>${esc(periodo)} · gerada em ${esc(quando)}</p>
+    <table style="border-collapse:collapse;"><thead><tr>${cab}</tr></thead><tbody>${rs.map(({x,t})=>`<tr><td style="${td}">${esc(x.n.nf||'')}</td><td style="${td}">${x.d?fmtDateBR(x.d):''}</td><td style="${td}">${esc(forn(x))}</td>${D?`<td style="${td}text-align:center;">${simp(t)}</td><td style="${tdv}">${fmtMoney(t.valor)}</td><td style="${tdv}">${t.pct?fmtPct(t.pct)+'% ('+t.cod+')':'-'}</td><td style="${tdv}">${t.desc?fmtMoney(t.desc):'-'}</td><td style="${tdv}"><b>${fmtMoney(t.liq)}</b></td>`:`<td style="${tdv}">${fmtMoney(t.valor)}</td>`}</tr>`).join('')}</tbody>
+    <tfoot><tr><td style="${td}" colspan="${D?4:3}"><b>TOTAL: ${itens.length} nota(s)</b></td><td style="${tdv}"><b>${fmtMoney(tV)}</b></td>${D?`<td style="${td}"></td><td style="${tdv}"><b>${fmtMoney(tD)}</b></td><td style="${tdv}"><b>${fmtMoney(tL)}</b></td>`:''}</tr></tfoot></table></div>`;
+  return { assunto, corpo, resumo, html, texto: `${relNotasTitulo()}\n${linhas.join('\n')}\n${totalTxt}` };
+}
+function confirmarEnvioRelacao(outroPrograma){
+  if(!relEnvio) return;
+  const dest = Array.from(document.querySelectorAll('.relEnvioDest')).filter(c=>c.checked).map(c=>c.value);
+  if(!dest.length){ showToast('Marque pelo menos um e-mail.','warning'); return; }
+  const M = relNotasEmailTexto(relEnvio.itens);
+  const montar = corpo => outroPrograma
+    ? 'mailto:'+dest.map(encodeURIComponent).join(',')+'?subject='+encodeURIComponent(M.assunto)+'&body='+encodeURIComponent(corpo)
+    : 'https://mail.google.com/mail/?view=cm&fs=1&tf=1&to='+encodeURIComponent(dest.join(','))+'&su='+encodeURIComponent(M.assunto)+'&body='+encodeURIComponent(corpo);
+  let url = montar(M.corpo), copiada = false;
+  if(url.length > (outroPrograma ? LIMITE_URL_MAILTO : LIMITE_URL_GMAIL)){
+    url = montar(M.resumo); copiada = true;
+    try{
+      if(window.ClipboardItem && navigator.clipboard && navigator.clipboard.write)
+        navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([M.html], {type:'text/html'}), 'text/plain': new Blob([M.texto], {type:'text/plain'}) })]).catch(()=>{});
+      else if(navigator.clipboard) navigator.clipboard.writeText(M.texto).catch(()=>{});
+    }catch(e){}
+  }
+  if(outroPrograma) window.location.href = url;
+  else { const w = window.open(url, '_blank'); if(!w){ showToast('O navegador bloqueou a nova aba do Gmail. Permita pop-ups para este site e tente de novo.','warning'); return; } }
+  registrarAcao('Enviou por e-mail a relação de notas ordenadas ('+relEnvio.dep+', '+relEnvio.itens.length+' nota(s)) para '+dest.join(', '));
+  relEnvio = null; fecharModal();
+  showToast(copiada ? 'E-mail aberto. A relação é longa, então foi copiada: clique no corpo do e-mail e cole com Ctrl+V antes de enviar.' : (outroPrograma ? 'Abrindo seu programa de e-mail com a relação.' : 'Gmail aberto com a relação preenchida. Confira e clique em Enviar.'), copiada ? 'warning' : 'success');
 }
 async function exportarRelacaoNotasExcel(){
   if(!window.XLSX){ showToast('A biblioteca do Excel não carregou.','error'); return; }
@@ -3066,13 +3193,14 @@ let filtroCred = '';
 let credEditId = null;
 function viewCredores(){
   const termo = normTxt(filtroCred);
-  const lst = STATE.credores.filter(c=>!termo || normTxt([c.nome,c.documento,c.banco,c.conta,c.pix].join(' ')).includes(termo)).sort((a,b)=>a.nome.localeCompare(b.nome));
+  const termoDig = soDigitos(filtroCred), soNumero = termoDig.length>=3 && !/[a-z]/i.test(filtroCred);
+  const lst = STATE.credores.filter(c=>!termo || normTxt([c.nome,c.documento,c.banco,c.conta,c.pix].join(' ')).includes(termo) || (soNumero && soDigitos(c.documento).includes(termoDig))).sort((a,b)=>a.nome.localeCompare(b.nome));
   const ed = credEditId ? (credEditId==='novo' ? { id:'', nome:'', ativo:true } : getCredor(credEditId)) : null;
   return `
     ${ed?`<div class="card"><h2>${ed.id?'✏️ Editar credor':'＋ Novo credor'}</h2>
       <div class="formgrid">
         <div class="field half"><label>Nome / razão social</label><input id="cr_nome" value="${esc(ed.nome)}"></div>
-        <div class="field"><label>CNPJ / CPF</label><input id="cr_documento" value="${esc(ed.documento||'')}"></div>
+        <div class="field"><label>CNPJ / CPF</label><input id="cr_documento" data-doc inputmode="numeric" autocomplete="off" placeholder="000.000.000-00 ou 00.000.000/0000-00" value="${esc(fmtDocExib(ed.documento))}"></div>
         <div class="field"><label>Situação</label><select id="cr_ativo"><option value="1">Ativo</option><option value="0" ${ed.ativo===false?'selected':''}>Inativo</option></select></div>
         <div class="field"><label>Banco</label><input id="cr_banco" value="${esc(ed.banco||'')}"></div>
         <div class="field"><label>Agência</label><input id="cr_agencia" value="${esc(ed.agencia||'')}"></div>
@@ -3088,13 +3216,16 @@ function viewCredores(){
         <button class="btn edit-only" onclick="credEditId='novo';render();window.scrollTo(0,0)">＋ Novo credor</button></div>
       <div class="table-wrap"><table><thead><tr><th>Credor</th><th>CNPJ/CPF</th><th>Banco</th><th>Agência</th><th>Conta</th><th>PIX</th><th>Simples</th><th class="num">Ordenado em ${exercicioSel}</th><th></th></tr></thead>
       <tbody>${lst.map(c=>{ const tot = notasDoExercicio(false).filter(n=>n.situacao!=='cancelada' && (n.credorId===c.id || normTxt(n.credor)===normTxt(c.nome))).reduce((s,n)=>s+(Number(n.valor)||0),0);
-        return `<tr><td class="trunc"><b>${esc(c.nome)}</b>${c.ativo===false?' <span class="badge inativo">inativo</span>':''}${c.obs?`<div class="small-txt">${esc(c.obs)}</div>`:''}</td><td class="nowrap">${esc(c.documento||'')}</td><td>${esc(c.banco||'')}</td><td>${esc(c.agencia||'')}</td><td class="nowrap">${esc(c.conta||'')}</td><td class="small-txt">${esc(c.pix||'')}</td><td>${soDigitos(c.documento).length===11?'':badgeSimples(simplesNaData(c,''))}</td><td class="num">${tot?fmtMoney(tot):'—'}</td>
+        return `<tr><td class="trunc"><b>${esc(c.nome)}</b>${c.ativo===false?' <span class="badge inativo">inativo</span>':''}${c.obs?`<div class="small-txt">${esc(c.obs)}</div>`:''}</td><td class="nowrap">${esc(fmtDocExib(c.documento))}</td><td>${esc(c.banco||'')}</td><td>${esc(c.agencia||'')}</td><td class="nowrap">${esc(c.conta||'')}</td><td class="small-txt">${esc(c.pix||'')}</td><td>${soDigitos(c.documento).length===11?'':badgeSimples(simplesNaData(c,''))}</td><td class="num">${tot?fmtMoney(tot):'—'}</td>
         <td><button class="btn ghost small edit-only" onclick="credEditId='${c.id}';render();window.scrollTo(0,0)">✏️</button></td></tr>`; }).join('') || '<tr class="empty-row"><td colspan="9">Nenhum credor.</td></tr>'}</tbody></table></div>
     </div>`;
 }
 function salvarCredor(){
   if(semPermissao('credores')) return;
   const nome = valCampo('cr_nome'); if(!nome){ showToast('Informe o nome.','warning'); return; }
+  const docDig = soDigitos(valCampo('cr_documento'));
+  if(docDig && docDig.length!==11 && docDig.length!==14){ showToast('CPF tem 11 dígitos e CNPJ tem 14. Confira o número.','warning'); return; }
+  if(docDig && !docValido(docDig) && !confirm('O '+(docDig.length===11?'CPF':'CNPJ')+' '+fmtCNPJ(docDig)+' não confere nos dígitos verificadores. Gravar assim mesmo?')) return;
   let c = credEditId==='novo' ? null : getCredor(credEditId);
   if(!c){
     if(STATE.credores.some(x=>normTxt(x.nome)===normTxt(nome)) && !confirm('Já existe um credor com este nome. Cadastrar outro?')) return;
@@ -3102,6 +3233,7 @@ function salvarCredor(){
   }
   const docAntes = soDigitos(c.documento);
   ['nome','documento','banco','agencia','conta','pix','obs'].forEach(k=>c[k] = valCampo('cr_'+k));
+  c.documento = docDig ? fmtCNPJ(docDig) : '';
   if(valCampo('cr_retCodigo') && (c.retCodigo || valCampo('cr_retCodigo')!==RET_PADRAO)) c.retCodigo = valCampo('cr_retCodigo');
   if(docAntes && soDigitos(c.documento)!==docAntes){ delete c.simplesOptante; c.simplesConsultaEm = ''; } c.ativo = valCampo('cr_ativo')!=='0';
   saveState(); registrarAcao('Credor salvo: '+c.nome); credEditId = null; render(); showToast('Credor salvo.','success');
@@ -3123,14 +3255,83 @@ function excluirCredor(id){
 function viewListas(){
   return `<div class="helpbox">Estas listas aparecem como sugestão ao digitar nos campos do carimbo e dos cadastros. Você pode incluir, renomear, reordenar ou remover itens — remover um item <b>não</b> altera notas e modelos já gravados.</div>
   ${tabelaRetencaoCardHTML()}
-  <div class="grid cols-2">${Object.keys(ROTULOS_LISTAS).map(k=>`<div class="card"><h2>${esc(ROTULOS_LISTAS[k])}</h2>
+  ${deptosEmailsCardHTML()}
+  <div class="grid cols-2">${Object.keys(ROTULOS_LISTAS).filter(k=>k!=='departamentos').map(k=>`<div class="card"><h2>${esc(ROTULOS_LISTAS[k])}</h2>
     <div class="table-wrap" style="max-height:300px;margin-top:8px;"><table><tbody>${lista(k).map((v,i)=>`<tr><td style="white-space:normal;">${esc(v)}</td><td class="nowrap edit-only" style="width:110px;"><button class="btn ghost small" onclick="moverItemLista('${k}',${i},-1)">▲</button><button class="btn ghost small" onclick="moverItemLista('${k}',${i},1)">▼</button><button class="btn ghost small" onclick="editarItemLista('${k}',${i})">✏️</button><button class="btn ghost small" onclick="removerItemLista('${k}',${i})">✕</button></td></tr>`).join('')}</tbody></table></div>
     <div class="actions edit-only" style="margin-top:8px;"><input id="nl_${k}" placeholder="Novo item…" style="flex:1;padding:7px 9px;border:1px solid var(--line);border-radius:7px;font-family:inherit;" onkeydown="if(event.key==='Enter') adicionarItemLista('${k}')"><button class="btn small" onclick="adicionarItemLista('${k}')">＋ Incluir</button></div>
   </div>`).join('')}</div>`;
 }
 function adicionarItemLista(k){ if(semPermissao('listas')) return; const v = valCampo('nl_'+k); if(!v) return; if(lista(k).some(x=>normTxt(x)===normTxt(v))){ showToast('Este item já existe.','warning'); return; } STATE.listas[k].push(v); saveState(); render(); }
-function editarItemLista(k, i){ if(semPermissao('listas')) return; const v = prompt('Editar item:', STATE.listas[k][i]); if(v===null || !v.trim()) return; STATE.listas[k][i] = v.trim(); saveState(); render(); }
-function removerItemLista(k, i){ if(semPermissao('listas')) return; if(!confirm('Remover "'+STATE.listas[k][i]+'" da lista?')) return; STATE.listas[k].splice(i,1); saveState(); render(); }
+function editarItemLista(k, i){ if(semPermissao('listas')) return; const antigo = STATE.listas[k][i]; const v = prompt('Editar item:', antigo); if(v===null || !v.trim()) return;
+  if(k==='departamentos' && normTxt(v)!==normTxt(antigo) && lista(k).some((x,j)=>j!==i && normTxt(x)===normTxt(v))){ showToast('Já existe um departamento com este nome.','warning'); return; }
+  STATE.listas[k][i] = v.trim(); if(k==='departamentos') renomearDeptoEmails(antigo, v.trim()); saveState(); render(); }
+function removerItemLista(k, i){ if(semPermissao('listas')) return; const nome = STATE.listas[k][i]; if(!confirm('Remover "'+nome+'" da lista?'+(k==='departamentos'&&emailsDepto(nome).length?'\nOs e-mails cadastrados para ele também serão removidos.':''))) return; STATE.listas[k].splice(i,1);
+  if(k==='departamentos'){ const ch = chaveEmailsDepto(nome); if(ch!==null) delete STATE.emailsDeptos[ch]; } saveState(); render(); }
+
+/* ---- E-mails dos departamentos (06/11/2026): até 3 por departamento, ao menos 1.
+   Guardados à parte em STATE.emailsDeptos = { "Compras": ["a@x.gov.br","",""] }, assim a
+   lista de departamentos continua sendo só de nomes e nada do que já existe muda.
+   Usados para enviar a Relação de notas ordenadas ao departamento escolhido. ---- */
+const RX_EMAIL = /^[^\s@,;<>"']+@[^\s@,;<>"']+\.[^\s@,;<>"'.]{2,}$/;
+function chaveEmailsDepto(nome){ const m = STATE.emailsDeptos||{}; if(Object.prototype.hasOwnProperty.call(m, nome)) return nome; const k = Object.keys(m).find(x=>normTxt(x)===normTxt(nome)); return k===undefined ? null : k; }
+function emailsDeptoBrutos(nome){ const k = chaveEmailsDepto(nome); return k!==null && Array.isArray(STATE.emailsDeptos[k]) ? STATE.emailsDeptos[k] : []; }
+function emailsDepto(nome){ return Array.from(new Set(emailsDeptoBrutos(nome).map(e=>String(e||'').trim().toLowerCase()).filter(e=>RX_EMAIL.test(e)))); }
+function renomearDeptoEmails(antigo, novo){
+  const k = chaveEmailsDepto(antigo); if(k!==null){ const v = STATE.emailsDeptos[k]; delete STATE.emailsDeptos[k]; STATE.emailsDeptos[novo] = v; }
+  if(relNotas && normTxt(relNotas.departamento)===normTxt(antigo)){ relNotas.departamento = novo; try{ localStorage.setItem(LOCAL_PREFIXO+'relDepto', novo); }catch(e){} }
+}
+// lê os 3 campos de e-mail (ids prefixo0..2); devolve { emails:[3 posições], erro }
+function lerEmailsCampos(prefixo){
+  const l = [0,1,2].map(j=>valCampo(prefixo+j).toLowerCase());
+  [0,1,2].forEach(j=>{ const el = document.getElementById(prefixo+j); if(el) el.style.borderColor = l[j] && !RX_EMAIL.test(l[j]) ? 'var(--red)' : ''; });
+  const inval = l.filter(e=>e && !RX_EMAIL.test(e));
+  if(inval.length) return { emails:l, erro:'E-mail inválido: '+inval.join(', ') };
+  if(!l.some(Boolean)) return { emails:l, erro:'Informe pelo menos 1 e-mail para o departamento.' };
+  const vistos = new Set(); const sem = l.map(e=>{ if(!e || vistos.has(e)) return ''; vistos.add(e); return e; });
+  return { emails: sem.filter(Boolean).concat(['','','']).slice(0,3), erro:'' };
+}
+function deptosEmailsCardHTML(){
+  const k = 'departamentos', ed = podeEditar('listas'), deps = lista(k);
+  const css = 'width:100%;min-width:170px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;font-family:inherit;font-size:12.5px;';
+  const inp = (id, v, ph, extra)=>`<input id="${id}" type="email" value="${esc(v||'')}" placeholder="${ph}" style="${css}" ${ed?'':'disabled'} ${extra||''}>`;
+  const semEmail = deps.filter(d=>!emailsDepto(d).length).length;
+  return `<div class="card"><h2>📧 ${esc(ROTULOS_LISTAS[k])} e e-mails</h2>
+    <div class="subtitle">Até <b>3 e-mails</b> por departamento (pelo menos 1). Ao imprimir ou enviar a <b>Relação de notas ordenadas</b>, o aplicativo pergunta se deseja mandá-la para os e-mails do departamento escolhido. Os e-mails são gravados ao sair de cada campo.${semEmail?` <b style="color:#8a5a1c">${semEmail} departamento(s) ainda sem e-mail.</b>`:''}</div>
+    <div class="table-wrap" style="margin-top:8px;"><table><thead><tr><th>Departamento</th><th>E-mail 1 *</th><th>E-mail 2</th><th>E-mail 3</th><th class="edit-only"></th></tr></thead><tbody>
+    ${deps.map((d,i)=>{ const em = emailsDeptoBrutos(d); return `<tr><td style="white-space:normal;min-width:130px;"><b>${esc(d)}</b><div id="deb_${i}">${emailsDepto(d).length?'':'<span class="badge ambar">sem e-mail</span>'}</div></td>
+      ${[0,1,2].map(j=>`<td>${inp('dem_'+i+'_'+j, em[j], j===0?'obrigatório':'opcional', `onchange="salvarEmailsDepto(${i})"`)}</td>`).join('')}
+      <td class="nowrap edit-only" style="width:110px;"><button class="btn ghost small" onclick="moverItemLista('${k}',${i},-1)">▲</button><button class="btn ghost small" onclick="moverItemLista('${k}',${i},1)">▼</button><button class="btn ghost small" onclick="editarItemLista('${k}',${i})" title="Renomear">✏️</button><button class="btn ghost small" onclick="removerItemLista('${k}',${i})" title="Remover">✖</button></td></tr>`; }).join('') || '<tr class="empty-row"><td colspan="5">Nenhum departamento cadastrado.</td></tr>'}
+    <tr class="edit-only"><td>${inp('ndep_nome','','Novo departamento…','type="text" onkeydown="if(event.key===\'Enter\') adicionarDeptoEmails()"').replace('type="email" ','')}</td>
+      ${[0,1,2].map(j=>`<td>${inp('ndep_'+j,'', j===0?'E-mail 1 (obrigatório)':'E-mail '+(j+1)+' (opcional)')}</td>`).join('')}
+      <td class="edit-only"><button class="btn small" onclick="adicionarDeptoEmails()">＋ Incluir</button></td></tr>
+    </tbody></table></div>
+  </div>`;
+}
+function salvarEmailsDepto(i){
+  if(semPermissao('listas')) return;
+  const nome = lista('departamentos')[i]; if(nome===undefined) return;
+  const r = lerEmailsCampos('dem_'+i+'_');
+  if(r.erro){
+    if(!r.emails.some(Boolean)){ showToast(r.erro+' O e-mail anterior foi mantido.','warning'); render(); return; }
+    showToast(r.erro,'error'); return;
+  }
+  const k = chaveEmailsDepto(nome); if(k!==null && k!==nome) delete STATE.emailsDeptos[k];
+  STATE.emailsDeptos[nome] = r.emails; saveState();
+  registrarAcao('E-mails do departamento '+nome+': '+r.emails.filter(Boolean).join(', '));
+  r.emails.forEach((e,j)=>{ const el = document.getElementById('dem_'+i+'_'+j); if(el) el.value = e; });
+  const b = document.getElementById('deb_'+i); if(b) b.innerHTML = '';
+  showToast('E-mails do departamento '+nome+' salvos.','success');
+}
+function adicionarDeptoEmails(){
+  if(semPermissao('listas')) return;
+  const nome = valCampo('ndep_nome');
+  if(!nome){ showToast('Informe o nome do departamento.','warning'); return; }
+  if(lista('departamentos').some(x=>normTxt(x)===normTxt(nome))){ showToast('Este departamento já existe.','warning'); return; }
+  const r = lerEmailsCampos('ndep_'); if(r.erro){ showToast(r.erro,'warning'); return; }
+  STATE.listas.departamentos.push(nome); STATE.emailsDeptos[nome] = r.emails; saveState();
+  registrarAcao('Departamento incluído: '+nome+' ('+r.emails.filter(Boolean).join(', ')+')'); render();
+  showToast('Departamento '+nome+' incluído.','success');
+}
 function moverItemLista(k, i, d){ if(semPermissao('listas')) return; const l = STATE.listas[k], j = i+d; if(j<0 || j>=l.length) return; [l[i], l[j]] = [l[j], l[i]]; saveState(); render(); }
 
 /* ============================================================
@@ -3286,7 +3487,7 @@ function exportarTudoExcel(){
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(STATE.recursos.map(r=>{ const c = calcRecurso(r); return { 'Exercício':r.exercicio, 'Área':r.area, 'Ficha':r.ficha, 'Recurso':recursoRotulo(r), 'Fonte':r.fonte, 'Saldo inicial':c.inicial, 'Entradas':c.entradas+c.ajustes, 'Ordenado':c.ordenado, 'Saldo':c.saldo, 'Empenhado':c.empenhado, 'Livre':c.livre }; })), 'Recursos');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(movPorTipo('empenho').map(e=>{ const k = calcEmpenho(e); return { 'Nº':e.numero, 'Data':e.data, 'Credor':e.credor, 'Valor':k.valor, 'Usado':k.usado, 'Saldo':k.saldo }; })), 'Empenhos');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(STATE.contratos.map(c=>{ const k = calcContrato(c); return { 'Número':c.numero, 'Tipo':c.tipo, 'Objeto':c.objeto, 'Credor':c.credor, 'Vigência':c.vigenciaFim, 'Valor':k.total, 'Ordenado':k.usado, 'Saldo':k.saldo }; })), 'Contratos');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(STATE.credores.map(c=>({ 'Credor':c.nome, 'CNPJ/CPF':c.documento||'', 'Banco':c.banco, 'Agência':c.agencia, 'Conta':c.conta, 'PIX':c.pix||'' }))), 'Credores');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(STATE.credores.map(c=>({ 'Credor':c.nome, 'CNPJ/CPF':fmtDocExib(c.documento), 'Banco':c.banco, 'Agência':c.agencia, 'Conta':c.conta, 'PIX':c.pix||'' }))), 'Credores');
   XLSX.writeFile(wb, 'ordenamento_completo_'+hojeISO()+'.xlsx');
 }
 

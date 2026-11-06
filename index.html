@@ -184,6 +184,23 @@ td.nowrap{white-space:nowrap;}
 .cir-corte span{position:absolute;left:50%;transform:translateX(-50%);background:#fff;padding:0 8px;font-size:9px;color:#555;white-space:nowrap;}
 .cir-prev{background:#E9EEF1;padding:14px;border-radius:10px;overflow:auto;}
 .cir-prev .cir-folha{background:#fff;padding:6mm 8mm;margin:0 auto;box-shadow:0 2px 10px rgba(0,0,0,.15);width:194mm;box-sizing:content-box;}
+/* comprovante de consulta ao Simples — optantes (1.13) */
+.cop .cop-cab{display:flex;align-items:center;gap:10px;padding:4px 8px 3px;border-bottom:1.2px solid #000;}
+.cop .cop-cab img{height:40px;}
+.cop .cop-cab .t{flex:1;text-align:center;font-family:Verdana,Arial,sans-serif;font-weight:700;font-size:11px;line-height:1.3;}
+.cop .cop-cab .t small{display:block;font-family:Calibri,Arial,sans-serif;font-weight:700;font-size:9.5px;}
+.cop .cop-img{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:3px 6px;overflow:hidden;}
+.cop .cop-img img{max-width:100%;max-height:100%;object-fit:contain;}
+.cop .cop-gerado{flex:1;padding:4px 10px;font-family:Arial,sans-serif;font-size:10.5px;line-height:1.45;}
+.cop .cop-gerado .bx{border:1px solid #9fc59a;margin-bottom:4px;}
+.cop .cop-gerado .bx b.h{display:block;background:#DFF0D8;color:#2F6B2F;font-weight:400;padding:2px 7px;border-bottom:1px solid #9fc59a;}
+.cop .cop-gerado .bx div{padding:2px 7px;}
+.cop .cop-gerado .ok{color:#1d5e1d;font-weight:700;}
+.cop .cop-rod{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;border-top:1.2px solid #000;padding:3px 8px 3px;font-size:9px;}
+.cop .cop-rod .ass{text-align:center;font-size:10.5px;min-width:42%;}
+.cop .cop-rod .ass .ln{border-top:1px solid #000;margin:14px 0 1px;}
+.cir-folha.um .cir-slot{height:auto;min-height:120mm;}
+.cir-folha.um .cop .cop-img img{max-height:215mm;}
 .rn-doc{background:#fff;color:#000;font-family:Calibri,Arial,sans-serif;max-width:760px;margin:0 auto;padding:6px 4px;}
 .rn-tit{display:flex;justify-content:space-between;gap:16px;font-size:17px;font-weight:800;}
 .rn-sub{font-weight:700;font-size:12.5px;margin:4px 0 14px;}
@@ -551,7 +568,7 @@ function mostrarTelaRegras(){
    Criação: novembro/2026 (mês 1).
    ============================================================ */
 const APP_CRIACAO = { mes: 11, ano: 2026 };
-const APP_ALTERACAO = 12;
+const APP_ALTERACAO = 13;
 const APP_DATA = '2026-11-06';
 function appVersao(){
   const p = APP_DATA.split('-').map(Number);
@@ -1810,7 +1827,7 @@ let recursoAbertoId = null, recursoEditId = null;
 function abrirRecurso(id){ recursoAbertoId = id; recursoEditId = null; currentView = 'recursos'; render(); window.scrollTo(0,0); }
 let abaRecursos = 'saldos';
 function abasRecursosHTML(){
-  const abas = [['saldos','💰 Recursos e saldos'],['atualizacao','📥 Atualização de recursos'],['relacao','📋 Relação de notas ordenadas'],['retencao','🧾 Carimbo de retenção IR'],['emendas','📜 Emendas e portarias']];
+  const abas = [['saldos','💰 Recursos e saldos'],['atualizacao','📥 Atualização de recursos'],['relacao','📋 Relação de notas ordenadas'],['retencao','🧾 Carimbo de retenção IR - Não optantes'],['optantes','✅ Carimbo de retenção IR - Optantes'],['emendas','📜 Emendas e portarias']];
   return `<div class="tabs">${abas.map(a=>`<div class="tab ${abaRecursos===a[0]?'active':''}" onclick="abaRecursos='${a[0]}';render()">${a[1]}</div>`).join('')}</div>`;
 }
 function viewRecursos(){
@@ -1819,6 +1836,7 @@ function viewRecursos(){
   if(abaRecursos==='atualizacao') return abasRecursosHTML() + viewAtualizacaoRecursos();
   if(abaRecursos==='relacao') return abasRecursosHTML() + viewRelacaoNotas();
   if(abaRecursos==='retencao') return abasRecursosHTML() + viewCarimboIR();
+  if(abaRecursos==='optantes') return abasRecursosHTML() + viewCarimboOptantes();
   if(abaRecursos==='emendas') return abasRecursosHTML() + viewEmendasPortarias();
   return abasRecursosHTML() + viewRecursosSaldos();
 }
@@ -2689,7 +2707,7 @@ function viewCarimboIR(){
   const pendCred = []; const vistos = new Set();
   pend.forEach(x=>{ const k = x.t.c ? x.t.c.id : 'n:'+normTxt(x.n.credor||''); if(vistos.has(k)) return; vistos.add(k); pendCred.push(x); });
   return `<div class="card no-print">
-    <h2>🧾 Carimbo de retenção do Imposto de Renda (IRRF)</h2>
+    <h2>🧾 Carimbo de retenção do Imposto de Renda (IRRF) — não optantes</h2>
     <div class="subtitle">Um carimbo para cada nota de fornecedor <b>não optante</b> pelo Simples Nacional, no modelo da planilha “Carimbo Retenção IR”: <b>3 carimbos por folha A4</b>, separados por linha pontilhada para destacar. Cada carimbo traz o nº da NF e o credor. A alíquota é a do IR da natureza do fornecedor (Tabela de retenção em Listas de opções) — a mesma da Relação de notas ordenadas.</div>
     <div class="filtros" style="margin-top:10px;">
       <div class="field"><label>Data considerada</label><select onchange="carIR.campoData=this.value;render()"><option value="data" ${C.campoData!=='emissao'?'selected':''}>Data do ordenamento</option><option value="emissao" ${C.campoData==='emissao'?'selected':''}>Data de emissão da NF</option></select></div>
@@ -2735,6 +2753,289 @@ function viewCarimboIR(){
   </div>
   <div class="card no-print"><div class="small-txt" style="margin-bottom:8px;">Prévia da 1ª folha${itens.length>3?` (de ${Math.ceil(itens.length/3)})`:''} — o brasão é o de Administração → Entidade e carimbo</div>
     <div class="cir-prev">${folhas[0] || '<div class="muted" style="padding:20px;text-align:center;">Nenhum carimbo para mostrar.</div>'}</div></div>`;
+}
+/* ============================================================
+   CARIMBO DE RETENÇÃO IR - OPTANTES (06/11/2026, 1.13): um comprovante de consulta ao
+   Simples Nacional por credor OPTANTE com notas no período (sem retenção de IR — IN RFB
+   1.234/2012, art. 4º, XI). O site da Receita (aplicacoes.aspx?id=21) tem captcha: o app
+   abre o site com o CNPJ copiado e o usuário anexa o PDF ("Gerar PDF"). O PDF é lido
+   (CNPJ, data, situação), ligado ao credor sozinho e guardado em partes como os anexos
+   dos recursos (credor.simplesPdf). Sem PDF, sai um comprovante montado com os dados
+   públicos do CNPJ já consultados (BrasilAPI / CNPJ.ws), identificado como tal.
+   Impressão: 3 por folha A4 com linha de corte; 1 por folha se a imagem não couber.
+   ============================================================ */
+const COP_NOTA_PADRAO = 'CREDOR OPTANTE PELO SIMPLES NACIONAL — SEM RETENÇÃO DO IMPOSTO DE RENDA NA FONTE (IN RFB Nº 1.234/2012, ART. 4º, XI)';
+let carOP = null;
+const copImgCache = new Map();
+function carOPEstado(){
+  if(carOP) return carOP;
+  const C = carIREstado();
+  carOP = { campoData:C.campoData, de:C.de, ate:C.ate, busca:'', fora:{}, porFolha:'auto', consultando:false, autoFeito:'', lendo:false };
+  return carOP;
+}
+function copNotaTexto(){ return (STATE.carimboIR && STATE.carimboIR.optantes) || COP_NOTA_PADRAO; }
+function copGrupos(){
+  const O = carOPEstado(), t = normTxt(O.busca||''), mapa = new Map();
+  movPorTipo('nota').filter(n=>!n.historico && n.situacao!=='cancelada')
+    .map(n=>({ n, f: O.campoData==='emissao' ? (n.emissao||n.data||'') : (n.data||n.emissao||'') }))
+    .filter(x=>x.f && (!O.de || x.f>=O.de) && (!O.ate || x.f<=O.ate))
+    .map(x=>Object.assign(x, { t: cirRet(x.n) }))
+    .filter(x=>x.t.simples==='S' && x.t.c)
+    .filter(x=>!t || normTxt([x.n.nf, x.n.credor, x.t.c.nome, numeroOrdenamento(x.n)].join(' ')).includes(t))
+    .forEach(x=>{ const c = x.t.c; if(!mapa.has(c.id)) mapa.set(c.id, { c, notas:[] }); mapa.get(c.id).notas.push(x); });
+  return Array.from(mapa.values()).sort((a,b)=>a.c.nome.localeCompare(b.c.nome,'pt-BR'));
+}
+function copDataHora(iso){ if(!iso) return '—'; const d = new Date(iso); if(isNaN(d)) return fmtDateBR(String(iso).slice(0,10)); return d.toLocaleDateString('pt-BR')+' '+pad2(d.getHours())+':'+pad2(d.getMinutes()); }
+function copDiasDesde(iso){ if(!iso) return null; const d = new Date(iso); return isNaN(d) ? null : Math.floor((Date.now()-d.getTime())/86400000); }
+// lê o texto do PDF da Receita: CNPJ, data da consulta, nome e situação
+async function copLerPdfReceita(buf, usarOcr){
+  let linhas = (await pdfLinhasTexto(buf.slice(0))).map(l=>l.txt), ocr = false;
+  if(!linhas.join('').trim() && usarOcr!==false){ try{ linhas = await copOcrLinhas(buf.slice(0)); ocr = true; }catch(e){ linhas = []; } }
+  const txt = linhas.join('\n');
+  const cnpj = soDigitos((txt.match(/\d{2}\s?\.\s?\d{3}\s?\.\s?\d{3}\s?\/\s?\d{4}\s?-\s?\d{2}/)||[''])[0]);
+  const dm = txt.match(/Data da consulta:?\s*(\d{2})\/(\d{2})\/(\d{4})\s*(\d{2}:\d{2}(?::\d{2})?)?/i);
+  const dataConsulta = dm ? `${dm[3]}-${dm[2]}-${dm[1]}T${(dm[4]||'00:00').padEnd(8,':00').slice(0,8)}` : '';
+  const pega = re=>{ const l = linhas.find(x=>re.test(x)); return l ? l.replace(re,'').trim() : ''; };
+  const situacao = pega(/^.*Situa[çc][ãa]o no Simples Nacional:?\s*/i), simei = pega(/^.*Situa[çc][ãa]o no SIMEI:?\s*/i), nome = pega(/^.*Nome Empresarial:?\s*/i);
+  const optante = situacao ? !/n[ãa]o optante/i.test(situacao) && /optante/i.test(situacao) : null;
+  const desde = (situacao.match(/desde\s*(\d{2})\/(\d{2})\/(\d{4})/i)||[]);
+  const mei = simei ? !/n[ãa]o enquadrado/i.test(simei) && /enquadrado/i.test(simei) : false;
+  return { cnpj: cnpj.length===14 ? cnpj : '', dataConsulta, situacao, simei, nome, optante, mei, desde: desde[3]?`${desde[3]}-${desde[2]}-${desde[1]}`:'', ocr, semTexto: !txt.trim() };
+}
+async function copGravarArquivo(f){
+  const b64 = await new Promise((ok,err)=>{ const fr = new FileReader(); fr.onload = ()=>ok(String(fr.result).split(',')[1]||''); fr.onerror = err; fr.readAsDataURL(f); });
+  const aid = uid(), partes = [];
+  for(let i=0; i<b64.length; i+=ANEXO_PARTE) partes.push(b64.slice(i, i+ANEXO_PARTE));
+  for(let i=0;i<partes.length;i++){
+    if(db) await db.collection(FIRESTORE_COLLECTION).doc(anexoDocId(aid,i)).set({ payload: partes[i], arquivo: f.name, parte: i, total: partes.length });
+    else localStorage.setItem(LOCAL_PREFIXO+'arq_'+aid+'_'+i, partes[i]);
+  }
+  return { id: aid, nome: f.name, tipo: f.type||'application/pdf', tamanho: f.size, partes: partes.length, em: new Date().toISOString(), por: relNotasConferente() };
+}
+async function copApagarArquivo(a){ if(!a) return; try{ for(let i=0;i<a.partes;i++){ if(db) await db.collection(FIRESTORE_COLLECTION).doc(anexoDocId(a.id,i)).delete(); else localStorage.removeItem(LOCAL_PREFIXO+'arq_'+a.id+'_'+i); } }catch(e){} copImgCache.delete(a.id); }
+// anexa um ou vários PDFs; cada um vai para o credor do CNPJ que está no PDF (ou para credorId, se informado)
+async function copAnexarPdfs(ev, credorId){
+  if(semPermissao('credores')) return;
+  const files = Array.from(ev.target.files||[]); ev.target.value = ''; if(!files.length) return;
+  const O = carOPEstado(); O.lendo = true; render();
+  const res = [];
+  for(const f of files){
+    try{
+      if(f.size > ANEXO_MAX) throw new Error('arquivo muito grande (máx. 8 MB)');
+      const buf = await f.arrayBuffer(), info = await copLerPdfReceita(buf.slice(0));
+      let c = credorId ? getCredor(credorId) : null;
+      const porCnpj = info.cnpj ? STATE.credores.find(x=>soDigitos(x.documento)===info.cnpj) : null;
+      if(!c) c = porCnpj;
+      if(!c){ res.push(`✗ ${f.name}: ${info.cnpj?'nenhum credor com o CNPJ '+fmtCNPJ(info.cnpj):'CNPJ não encontrado no PDF'} — cadastre o CNPJ do credor ou use o 📎 da linha dele.`); continue; }
+      if(info.cnpj && soDigitos(c.documento) && soDigitos(c.documento)!==info.cnpj && !confirm(`O PDF ${f.name} é do CNPJ ${fmtCNPJ(info.cnpj)}, mas ${c.nome} tem o CNPJ ${fmtCNPJ(soDigitos(c.documento))}. Anexar assim mesmo?`)){ res.push(`✗ ${f.name}: cancelado (CNPJ diferente).`); continue; }
+      if(!soDigitos(c.documento) && info.cnpj) c.documento = info.cnpj;
+      const meta = await copGravarArquivo(f);
+      const antigo = c.simplesPdf; c.simplesPdf = Object.assign(meta, { dataConsulta: info.dataConsulta, situacao: info.situacao, simei: info.simei, nomeEmpresarial: info.nome, cnpj: info.cnpj });
+      if(antigo) await copApagarArquivo(antigo);
+      if(info.optante!==null){
+        c.simplesOptante = info.optante; c.simplesMei = info.mei; c.simplesDataOpcao = info.desde || ''; c.simplesDataExclusao = ''; c.simplesManual = false; c.simplesErro = '';
+        c.simplesConsultaEm = info.dataConsulta ? new Date(info.dataConsulta).toISOString() : new Date().toISOString(); c.simplesFonte = 'PDF do site do Simples Nacional (Receita Federal)';
+        if(info.nome) c.simplesRazao = info.nome;
+      }
+      res.push(`✓ ${c.nome}: ${info.situacao || 'PDF anexado'}${info.optante===false?' — NÃO optante: vai para a aba dos não optantes':''}`);
+      registrarAcao('Anexou a consulta do Simples Nacional (PDF) de '+c.nome);
+    }catch(e){ res.push(`✗ ${f.name}: ${e.message||e}`); }
+  }
+  O.lendo = false; saveState(); render();
+  const erros = res.filter(r=>r[0]==='✗').length;
+  if(res.length===1) showToast(res[0], erros?'warning':'success'); else alert(res.join('\n'));
+}
+async function copVerPdf(credorId){
+  const c = getCredor(credorId), a = c && c.simplesPdf; if(!a) return;
+  const w = window.open('', '_blank');
+  try{ const url = URL.createObjectURL(await lerAnexo(a)); if(w) w.location.href = url; else window.open(url,'_blank'); setTimeout(()=>URL.revokeObjectURL(url), 60000); }
+  catch(e){ if(w) w.close(); showToast('Não foi possível abrir o PDF: '+e.message,'error'); }
+}
+async function copRemoverPdf(credorId){
+  if(semPermissao('credores')) return;
+  const c = getCredor(credorId); if(!c || !c.simplesPdf) return;
+  if(!confirm('Remover o PDF da consulta de '+c.nome+'?')) return;
+  const a = c.simplesPdf; delete c.simplesPdf; saveState(); await copApagarArquivo(a); registrarAcao('Removeu o PDF da consulta do Simples de '+c.nome); render();
+}
+function copAbrirReceita(credorId){
+  const c = getCredor(credorId), doc = soDigitos(c && c.documento);
+  if(doc){ try{ navigator.clipboard.writeText(doc); showToast('CNPJ '+fmtCNPJ(doc)+' copiado — cole no site (Ctrl+V), resolva o captcha, clique em “Gerar PDF” e anexe aqui com 📎.','info'); }catch(e){} }
+  window.open(LINK_RECEITA_SIMPLES, '_blank', 'noopener');
+}
+async function copConsultarUm(credorId){
+  const c = getCredor(credorId); if(!c) return;
+  const O = carOPEstado(); O.consultando = true; render();
+  const ok = await consultarSimplesCredor(c, false); O.consultando = false; if(ok) saveState(); render();
+}
+async function copConsultarTodos(forcar, silencioso){
+  const O = carOPEstado(); if(O.consultando) return;
+  // candidatos: credores de TODAS as notas do período com CNPJ (para achar optantes ainda não consultados)
+  const vistos = new Set(), alvo = [];
+  movPorTipo('nota').filter(n=>!n.historico && n.situacao!=='cancelada').forEach(n=>{ const f = O.campoData==='emissao'?(n.emissao||n.data):(n.data||n.emissao); if(!f || (O.de && f<O.de) || (O.ate && f>O.ate)) return;
+    const c = credorDaNota(n); if(c && !vistos.has(c.id) && soDigitos(c.documento).length===14 && (forcar || (!consultaHoje(c) && !(c.simplesPdf && copDiasDesde(c.simplesConsultaEm)===0)))){ vistos.add(c.id); alvo.push(c); } });
+  if(!alvo.length){ if(!silencioso) showToast('Nenhum fornecedor para consultar (os já consultados hoje foram mantidos).','info'); return; }
+  O.consultando = true; render();
+  let ok = 0, falha = 0;
+  for(const c of alvo){ if(await consultarSimplesCredor(c, true)) ok++; else falha++; await new Promise(r=>setTimeout(r, 350)); }
+  O.consultando = false; saveState(); registrarAcao(`Consultou o Simples Nacional de ${ok} fornecedor(es) (optantes)`); render();
+  if(!silencioso || falha) showToast(`Simples Nacional consultado: ${ok} fornecedor(es)${falha?' — '+falha+' sem resposta':''}.`, falha?'warning':'success');
+}
+// primeira página do PDF da Receita como imagem, sem as margens brancas
+async function copImagemPdf(a){
+  if(copImgCache.has(a.id)) return copImgCache.get(a.id);
+  const out = await copRenderPdf(await (await lerAnexo(a)).arrayBuffer());
+  const r = { src: out.toDataURL('image/png'), ratio: out.height/out.width };
+  copImgCache.set(a.id, r); return r;
+}
+async function copRenderPdf(buf){
+  const lib = await carregarPdfJs();
+  const pdf = await lib.getDocument({ data: buf }).promise, pg = await pdf.getPage(1), vp = pg.getViewport({ scale: 2.2 });
+  const cv = document.createElement('canvas'); cv.width = Math.ceil(vp.width); cv.height = Math.ceil(vp.height);
+  const ctx = cv.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0,0,cv.width,cv.height);
+  await pg.render({ canvasContext: ctx, viewport: vp, intent:'print' }).promise; // 'print': não depende de requestAnimationFrame (a janela de impressão deixa esta aba em segundo plano)
+  const px = ctx.getImageData(0,0,cv.width,cv.height).data; let x0 = cv.width, y0 = cv.height, x1 = -1, y1 = -1;
+  for(let y=0; y<cv.height; y+=2) for(let x=0; x<cv.width; x+=2){ const i = (y*cv.width+x)*4; if(px[i]<235 || px[i+1]<235 || px[i+2]<235){ if(x<x0) x0=x; if(x>x1) x1=x; if(y<y0) y0=y; if(y>y1) y1=y; } }
+  if(x1<0){ x0=0; y0=0; x1=cv.width-1; y1=cv.height-1; }
+  // tira do fim os blocos baixos e verdes (botões "Mais informações", "Voltar", "Gerar PDF" do site)
+  if(x1>=0){
+    const blocos = []; let ini = -1, ult = -1;
+    for(let y=y0; y<=y1; y+=2){ let tem = false; for(let x=x0; x<=x1; x+=3){ const i = (y*cv.width+x)*4; if(px[i]<235 || px[i+1]<235 || px[i+2]<235){ tem = true; break; } }
+      if(tem){ if(ini<0) ini = y; ult = y; } else if(ini>=0 && y-ult>16){ blocos.push([ini, ult]); ini = -1; } }
+    if(ini>=0) blocos.push([ini, ult]);
+    const altura = y1-y0+1, verde = (a,b)=>{ let v = 0, t = 0; for(let y=a; y<=b; y+=2) for(let x=x0; x<=x1; x+=3){ const i = (y*cv.width+x)*4, r = px[i], g = px[i+1], bl = px[i+2]; if(r<235 || g<235 || bl<235){ t++; if(g>r+15 && g>bl+15) v++; } } return t ? v/t : 0; };
+    while(blocos.length>1){ const [a,b] = blocos[blocos.length-1]; if(b-a < altura*0.12 && verde(a,b) > 0.5){ blocos.pop(); y1 = blocos[blocos.length-1][1]; } else break; }
+  }
+  const m = 12; x0 = Math.max(0,x0-m); y0 = Math.max(0,y0-m); x1 = Math.min(cv.width-1,x1+m); y1 = Math.min(cv.height-1,y1+m);
+  const out = document.createElement('canvas'); out.width = x1-x0+1; out.height = y1-y0+1;
+  out.getContext('2d').drawImage(cv, x0, y0, out.width, out.height, 0, 0, out.width, out.height);
+  return out;
+}
+// OCR (Tesseract.js, carregado só quando preciso): o PDF do site da Receita é imagem, sem texto
+const TESS_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+let tessCarregando = null;
+function carregarTesseract(){
+  if(window.Tesseract) return Promise.resolve(window.Tesseract);
+  if(tessCarregando) return tessCarregando;
+  tessCarregando = new Promise((ok, err)=>{ const s = document.createElement('script'); s.src = TESS_URL; s.onload = ()=>window.Tesseract ? ok(window.Tesseract) : err(new Error('OCR indisponível')); s.onerror = ()=>{ tessCarregando = null; err(new Error('não foi possível carregar o leitor de imagem (OCR) — verifique a internet')); }; document.head.appendChild(s); });
+  return tessCarregando;
+}
+async function copOcrLinhas(buf){
+  const T = await carregarTesseract(), cv = await copRenderPdf(buf);
+  const r = await Promise.race([T.recognize(cv, 'por'), new Promise((_,x)=>setTimeout(()=>x(new Error('a leitura da imagem demorou demais')), 90000))]);
+  return String(r && r.data && r.data.text || '').split(/\r?\n/).map(s=>s.replace(/\s+/g,' ').trim()).filter(Boolean);
+}
+async function copItens(grupos){
+  const O = carOPEstado(), itens = [];
+  for(const g of grupos.filter(g=>!O.fora[g.c.id])){
+    let img = null, erro = '';
+    if(g.c.simplesPdf){ try{ img = await copImagemPdf(g.c.simplesPdf); }catch(e){ erro = e.message||String(e); } }
+    itens.push({ c:g.c, notas:g.notas, img, erro });
+  }
+  return itens;
+}
+function copHTML(d){
+  const c = d.c, doc = soDigitos(c.documento), brasao = imgEntidade(STATE.entidade.brasao), a = c.simplesPdf;
+  const nfs = d.notas.map(x=>`${esc(x.n.nf||'s/n')} (${fmtMoney(x.n.valor)})`).join(' · ');
+  const ords = Array.from(new Set(d.notas.map(x=>x.n.numero?numeroOrdenamento(x.n):'').filter(Boolean))).join(', ');
+  const corpo = d.img ? `<div class="cop-img"><img src="${d.img.src}" alt=""></div>`
+    : `<div class="cop-gerado">
+        <div><b>Data da consulta:</b> ${copDataHora(c.simplesConsultaEm)}</div>
+        <div class="bx"><b class="h">Identificação do Contribuinte - CNPJ</b><div>CNPJ: <span class="ok">${esc(fmtCNPJ(doc))}</span> &nbsp; · &nbsp; Nome Empresarial: <span class="ok">${esc(c.simplesRazao||c.nome)}</span></div></div>
+        <div class="bx"><b class="h">Situação</b><div>Situação no Simples Nacional: <span class="ok">${c.simplesOptante?'Optante pelo Simples Nacional'+(c.simplesDataOpcao?' desde '+fmtDateBR(String(c.simplesDataOpcao).slice(0,10)):''):'NÃO optante'}</span><br>Situação no SIMEI: <span class="ok">${c.simplesMei?'Enquadrado no SIMEI'+(c.simplesDataOpcao?' desde '+fmtDateBR(String(c.simplesDataOpcao).slice(0,10)):''):'Não enquadrado no SIMEI'}</span></div></div>
+        ${d.erro?`<div style="color:#a00;">PDF anexado não pôde ser lido: ${esc(d.erro)}</div>`:''}
+      </div>`;
+  const fonte = d.img ? `${a.dataConsulta?"Consulta de "+copDataHora(a.dataConsulta):"PDF anexado em "+copDataHora(a.em)} — PDF gerado no site do Simples Nacional (Receita Federal)`
+    : `Comprovante gerado pelo sistema com os dados públicos do CNPJ (${esc(c.simplesFonte||'Receita Federal')}). Para o comprovante oficial, anexe o PDF do site do Simples Nacional.`;
+  return `<div class="cir cop">
+    <div class="cop-cab">${brasao?`<img src="${brasao}" alt="">`:''}<div class="t">COMPROVANTE DE CONSULTA — SITUAÇÃO NO SIMPLES NACIONAL<small>${esc(copNotaTexto())}</small></div></div>
+    <table class="cir-ref"><colgroup><col style="width:62%"><col></colgroup>
+      <tr><td><b>CREDOR:</b> ${esc(String(c.nome||'').toUpperCase())}${doc?` — CNPJ ${esc(fmtCNPJ(doc))}`:''}</td><td><b>ORDENAMENTO:</b> ${esc(ords||'—')}</td></tr>
+      <tr><td colspan="2" style="white-space:normal;"><b>NOTA(S) FISCAL(IS) Nº:</b> ${nfs}</td></tr></table>
+    ${corpo}
+    <div class="cop-rod"><span>${fonte}</span><span class="ass"><div class="ln"></div>Assinatura</span></div>
+  </div>`;
+}
+function copModoFolha(itens){ const O = carOPEstado(); if(O.porFolha==='1') return 1; if(O.porFolha==='3') return 3; return itens.some(d=>d.img && d.img.ratio>0.85) ? 1 : 3; }
+function copFolhasHTML(itens){
+  const k = copModoFolha(itens), folhas = [];
+  for(let i=0; i<itens.length; i+=k){
+    const g = itens.slice(i, i+k);
+    folhas.push(`<div class="cir-folha${k===1?' um':''}">${g.map((d,j)=>`${j?'<div class="cir-corte"><span>✂ recorte aqui</span></div>':''}<div class="cir-slot">${copHTML(d)}</div>`).join('')}</div>`);
+  }
+  return folhas;
+}
+async function imprimirComprovantesOP(credorId){
+  const grupos = copGrupos().filter(g=>!credorId || g.c.id===credorId);
+  const O = carOPEstado(), sel = credorId ? grupos : grupos.filter(g=>!O.fora[g.c.id]);
+  if(!sel.length){ showToast('Nenhum credor marcado para imprimir.','warning'); return; }
+  const semNada = sel.filter(g=>!g.c.simplesPdf && !g.c.simplesConsultaEm);
+  if(semNada.length && !confirm(`${semNada.length} credor(es) sem consulta registrada:\n• ${semNada.map(g=>g.c.nome).join('\n• ')}\n\nImprimir assim mesmo?`)) return;
+  const w = window.open('', '_blank');
+  if(!w){ showToast('O navegador bloqueou a janela de impressão. Libere os pop-ups deste site.','warning'); return; }
+  w.document.write('<p style="font-family:Arial;padding:20px;">Preparando os comprovantes…</p>');
+  const salvo = O.fora; if(credorId) O.fora = {};
+  const itens = await copItens(sel); O.fora = salvo;
+  const folhas = copFolhasHTML(itens).map((f,i,a)=>`<div class="pg" style="${i<a.length-1?'page-break-after:always;':''}">${f}</div>`).join('');
+  w.document.open();
+  w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Consulta Simples Nacional - optantes</title><style>${cssDaPagina()}
+    @page{size:A4 portrait;margin:8mm;} html,body{background:#fff;margin:0;} body *{visibility:visible !important;}
+    .pg{width:194mm;margin:0 auto;} .cir,.cir *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    @media screen{ body{background:#e9eef1;padding:20px 0;} .pg{background:#fff;padding:8mm;box-sizing:content-box;margin:0 auto 20px;box-shadow:0 2px 10px rgba(0,0,0,.15);} }
+  </style></head><body>${folhas}<script>window.onload=function(){setTimeout(function(){window.print();},400);};<\/script></body></html>`);
+  w.document.close();
+  registrarAcao('Imprimiu '+itens.length+' comprovante(s) de consulta ao Simples (optantes)');
+}
+async function copPreencherPrevia(){
+  const el = document.getElementById('copPrev'); if(!el) return;
+  try{ const itens = await copItens(copGrupos()); const f = copFolhasHTML(itens.slice(0, copModoFolha(itens))); const el2 = document.getElementById('copPrev'); if(el2) el2.innerHTML = f[0] || '<div class="muted" style="padding:20px;text-align:center;">Nenhum comprovante para mostrar.</div>'; }
+  catch(e){ el.innerHTML = '<div class="muted" style="padding:20px;">Não foi possível montar a prévia: '+esc(e.message||String(e))+'</div>'; }
+}
+function copSalvarTexto(){
+  if(semPermissao('listas')) return;
+  STATE.carimboIR = Object.assign({}, STATE.carimboIR||{}, { optantes: valCampo('copt_nota') || COP_NOTA_PADRAO }); saveState(); render(); showToast('Texto salvo.','success');
+}
+function viewCarimboOptantes(){
+  const O = carOPEstado(), grupos = copGrupos(), marc = grupos.filter(g=>!O.fora[g.c.id]);
+  const chave = [O.campoData,O.de,O.ate].join('|');
+  if(O.autoFeito!==chave && !O.consultando){ O.autoFeito = chave; setTimeout(()=>copConsultarTodos(false, true), 60); }
+  setTimeout(copPreencherPrevia, 30);
+  const totV = r2(marc.reduce((s,g)=>s+g.notas.reduce((a,x)=>a+(Number(x.n.valor)||0),0),0));
+  const pode = podeEditar('credores');
+  return `<div class="card no-print">
+    <h2>✅ Carimbo de retenção IR — optantes (comprovante de consulta ao Simples Nacional)</h2>
+    <div class="subtitle">Credores <b>optantes</b> pelo Simples Nacional não sofrem retenção de IR. Para cada credor optante com nota no período sai um <b>comprovante da consulta</b> ao Simples Nacional, com o nº da(s) NF e o credor — <b>3 por folha A4</b> com linha pontilhada para destacar (ou 1 por folha quando a consulta não couber).<br>
+      <b>Como gerar o PDF oficial:</b> clique em 🌐 (o CNPJ é copiado e o site da Receita abre), cole o CNPJ, resolva o captcha, clique em <b>Consultar</b> e depois em <b>Gerar PDF</b>; volte aqui e anexe com 📎. Pode anexar vários PDFs de uma vez no botão de cima: o app lê o CNPJ de cada um e liga ao credor certo. Sem PDF anexado, sai o comprovante com os dados públicos do CNPJ consultados pelo app.</div>
+    <div class="filtros" style="margin-top:10px;">
+      <div class="field"><label>Data considerada</label><select onchange="carOP.campoData=this.value;render()"><option value="data" ${O.campoData!=='emissao'?'selected':''}>Data do ordenamento</option><option value="emissao" ${O.campoData==='emissao'?'selected':''}>Data de emissão da NF</option></select></div>
+      <div class="field"><label>Período inicial</label><input type="date" value="${esc(O.de)}" onchange="carOP.de=this.value;render()"></div>
+      <div class="field"><label>Período final</label><input type="date" value="${esc(O.ate)}" onchange="carOP.ate=this.value;render()"></div>
+      <div class="field"><label>Por folha</label><select onchange="carOP.porFolha=this.value;render()"><option value="auto" ${O.porFolha==='auto'?'selected':''}>Automático (3, ou 1 se não couber)</option><option value="3" ${O.porFolha==='3'?'selected':''}>3 por folha</option><option value="1" ${O.porFolha==='1'?'selected':''}>1 por folha</option></select></div>
+      <div class="field busca"><label>Buscar</label><input value="${esc(O.busca)}" placeholder="NF, credor, nº do ordenamento…" onkeydown="if(event.key==='Enter'){carOP.busca=this.value;render();}" onblur="if(this.value!==carOP.busca){carOP.busca=this.value;render();}"></div>
+    </div>
+    <div class="actions">
+      <button class="btn" ${O.consultando||O.lendo||!marc.length?'disabled':''} onclick="imprimirComprovantesOP()">🖨️ Imprimir comprovantes (${marc.length})</button>
+      ${pode?`<label class="btn secondary" style="cursor:pointer;">📎 Anexar PDFs da Receita<input type="file" accept="application/pdf,.pdf" multiple style="display:none" onchange="copAnexarPdfs(event)"></label>`:''}
+      <button class="btn secondary" ${O.consultando?'disabled':''} onclick="copConsultarTodos(true)">🔄 Consultar Simples Nacional</button>
+      <button class="btn ghost small" onclick="carOP.fora={};render()">Marcar todos</button><button class="btn ghost small" onclick="copGrupos().forEach(g=>carOP.fora[g.c.id]=1);render()">Desmarcar todos</button>
+      <span class="small-txt">${marc.length} comprovante(s) · ${marc.reduce((s,g)=>s+g.notas.length,0)} nota(s) · ${fmtMoney(totV)} sem retenção${O.consultando?' · ⏳ consultando o Simples Nacional…':''}${O.lendo?' · ⏳ lendo os PDFs…':''}</span>
+    </div>
+    <div class="table-wrap" style="margin-top:10px;max-height:420px;"><table>
+      <thead><tr><th></th><th>Credor</th><th>CNPJ</th><th>Nota(s) fiscal(is)</th><th class="num">Valor</th><th>Situação no Simples</th><th>Consulta</th><th></th></tr></thead>
+      <tbody>${grupos.map(g=>{ const c = g.c, a = c.simplesPdf, dias = copDiasDesde(a ? (a.dataConsulta||a.em) : c.simplesConsultaEm);
+        return `<tr style="${O.fora[c.id]?'opacity:.45':''}"><td><input type="checkbox" ${O.fora[c.id]?'':'checked'} onchange="if(this.checked) delete carOP.fora['${c.id}']; else carOP.fora['${c.id}']=1; render()"></td>
+        <td class="trunc"><b>${esc(c.nome)}</b></td><td class="nowrap">${esc(fmtCNPJ(soDigitos(c.documento)))}</td>
+        <td style="white-space:normal;">${g.notas.map(x=>`NF <b>${esc(x.n.nf||'s/n')}</b> <span class="small-txt">(${numeroOrdenamento(x.n)})</span>`).join('<br>')}</td>
+        <td class="num nowrap">${fmtMoney(g.notas.reduce((s,x)=>s+(Number(x.n.valor)||0),0))}</td>
+        <td><span class="badge ok">${c.simplesMei?'MEI / SIMEI':'Optante'}</span>${c.simplesDataOpcao?`<div class="small-txt">desde ${fmtDateBR(String(c.simplesDataOpcao).slice(0,10))}</div>`:''}</td>
+        <td class="nowrap">${a?`<span class="badge azul">PDF da Receita</span><div class="small-txt">${copDataHora(a.dataConsulta||a.em)}</div>`:c.simplesConsultaEm?`<span class="badge neutro">${c.simplesManual?'marcado à mão':'dados públicos'}</span><div class="small-txt">${copDataHora(c.simplesConsultaEm)}</div>`:'<span class="badge ruim">sem consulta</span>'}${dias!==null&&dias>30?`<div class="small-txt" style="color:#a15c00;">há ${dias} dias</div>`:''}</td>
+        <td class="nowrap"><button class="btn ghost small" title="Abrir o site do Simples Nacional (CNPJ copiado)" onclick="copAbrirReceita('${c.id}')">🌐</button>${pode?`<label class="btn ghost small" title="Anexar o PDF da consulta deste credor" style="cursor:pointer;">📎<input type="file" accept="application/pdf,.pdf" style="display:none" onchange="copAnexarPdfs(event,'${c.id}')"></label>`:''}${a?`<button class="btn ghost small" title="Ver o PDF anexado" onclick="copVerPdf('${c.id}')">👁️</button>${pode?`<button class="btn ghost small" title="Remover o PDF" onclick="copRemoverPdf('${c.id}')">✕</button>`:''}`:''}<button class="btn ghost small" title="Consultar agora (dados públicos do CNPJ)" onclick="copConsultarUm('${c.id}')">🔄</button><button class="btn ghost small" title="Imprimir só este comprovante" onclick="imprimirComprovantesOP('${c.id}')">🖨️</button></td></tr>`; }).join('') || `<tr class="empty-row"><td colspan="8">Nenhum credor optante com nota no período. Credores sem situação no Simples aparecem na aba dos não optantes, para marcar.</td></tr>`}</tbody></table></div>
+    <details style="margin-top:12px;"><summary style="cursor:pointer;font-weight:700;font-size:13px;">✏️ Texto do cabeçalho do comprovante</summary>
+      <div class="formgrid" style="margin-top:8px;"><div class="field wide"><label>Texto abaixo do título</label><input id="copt_nota" value="${esc(copNotaTexto())}"></div></div>
+      <div class="actions edit-only" style="margin-top:8px;"><button class="btn small" onclick="copSalvarTexto()">💾 Salvar texto</button><button class="btn ghost small" onclick="if(STATE.carimboIR){delete STATE.carimboIR.optantes;saveState();render();}">Voltar ao padrão</button></div>
+    </details>
+  </div>
+  <div class="card no-print"><div class="small-txt" style="margin-bottom:8px;">Prévia da 1ª folha — o brasão é o de Administração → Entidade e carimbo</div>
+    <div class="cir-prev" id="copPrev"><div class="muted" style="padding:20px;text-align:center;">Montando a prévia…</div></div></div>`;
 }
 function viewRelacaoNotas(){
   const R = relNotasEstado();

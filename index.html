@@ -523,7 +523,7 @@ function mostrarTelaRegras(){
    Criação: novembro/2026 (mês 1).
    ============================================================ */
 const APP_CRIACAO = { mes: 11, ano: 2026 };
-const APP_ALTERACAO = 10;
+const APP_ALTERACAO = 11;
 const APP_DATA = '2026-11-06';
 function appVersao(){
   const p = APP_DATA.split('-').map(Number);
@@ -2161,7 +2161,8 @@ function relNotasEstado(){
   const h = hojeISO(), a = h.slice(0,4), m = h.slice(5,7);
   let depto = ''; try{ depto = localStorage.getItem(LOCAL_PREFIXO+'relDepto') || ''; }catch(e){}
   let descontar = true; try{ descontar = localStorage.getItem(LOCAL_PREFIXO+'relDescontar')!=='0'; }catch(e){}
-  relNotas = { de: a+'-'+m+'-01', ate: a+'-'+m+'-'+pad2(new Date(Number(a), Number(m), 0).getDate()), departamento: depto || lista('departamentos')[0] || '', area:'', situacao:'', fora:{}, descontar, nat:{}, consultando:false, autoFeito:'' };
+  let campoData = 'data'; try{ campoData = localStorage.getItem(LOCAL_PREFIXO+'relCampoData')==='emissao' ? 'emissao' : 'data'; }catch(e){}
+  relNotas = { campoData, de: a+'-'+m+'-01', ate: a+'-'+m+'-'+pad2(new Date(Number(a), Number(m), 0).getDate()), departamento: depto || lista('departamentos')[0] || '', area:'', situacao:'', fora:{}, descontar, nat:{}, consultando:false, autoFeito:'' };
   return relNotas;
 }
 
@@ -2484,11 +2485,26 @@ function relFornecedoresHTML(){
 function relNotasLista(){
   const R = relNotasEstado();
   return movPorTipo('nota').filter(n=>!n.historico && n.situacao!=='cancelada')
-    .map(n=>({ n, d: n.emissao || n.data || '' }))
-    .filter(x=>x.d && (!R.de || x.d>=R.de) && (!R.ate || x.d<=R.ate))
+    .map(n=>({ n, d: n.emissao || n.data || '', f: R.campoData==='emissao' ? (n.emissao || n.data || '') : (n.data || n.emissao || '') }))
+    .filter(x=>x.f && (!R.de || x.f>=R.de) && (!R.ate || x.f<=R.ate))
     .filter(x=>!R.situacao || x.n.situacao===R.situacao)
     .filter(x=>{ if(!R.area) return true; const r = getRecurso(x.n.recursoId); return r && r.area===R.area; })
     .sort((a,b)=>a.d.localeCompare(b.d) || String(a.n.credor||'').localeCompare(String(b.n.credor||''),'pt-BR') || String(a.n.nf||'').localeCompare(String(b.n.nf||''),'pt-BR',{numeric:true}));
+}
+/* 06/11/2026 (1.11): o período pode valer pela data do ordenamento (padrão, igual à tela
+   Notas ordenadas) ou pela emissão da NF. Avisa as notas que o outro critério incluiria. */
+function relPeriodoRotulo(maiusc){ const s = relNotasEstado().campoData==='emissao' ? 'emissão' : 'ordenadas'; return maiusc ? s.charAt(0).toUpperCase()+s.slice(1) : s; }
+function relForaDoPeriodoHTML(){
+  const R = relNotasEstado(); if(!R.de && !R.ate) return '';
+  const dentro = d=>!!d && (!R.de || d>=R.de) && (!R.ate || d<=R.ate);
+  const outro = R.campoData==='emissao' ? 'data' : 'emissao';
+  const fora = movPorTipo('nota').filter(n=>!n.historico && n.situacao!=='cancelada' && (!R.situacao || n.situacao===R.situacao))
+    .filter(n=>{ if(!R.area) return true; const r = getRecurso(n.recursoId); return r && r.area===R.area; })
+    .filter(n=>{ const fAtual = R.campoData==='emissao' ? (n.emissao||n.data) : (n.data||n.emissao); return !dentro(fAtual) && dentro(n[outro]); });
+  if(!fora.length) return '';
+  const txt = R.campoData==='emissao' ? 'foram <b>ordenadas</b> neste período, mas a <b>emissão</b> é de fora dele' : 'têm <b>emissão</b> neste período, mas foram <b>ordenadas</b> fora dele';
+  return `<div class="alerta-aviso" style="margin:-2px 0 10px;">⚠️ ${fora.length} nota(s) ${txt} e não entraram na relação: ${fora.slice(0,6).map(n=>`NF ${esc(n.nf||'s/n')} — ${esc(n.credor||n.modeloRotulo||'')} (ordenada ${n.data?fmtDateBR(n.data):'—'}, emissão ${n.emissao?fmtDateBR(n.emissao):'—'})`).join('; ')}${fora.length>6?'…':''}.
+    <a href="#" onclick="relNotas.campoData='${outro}';try{localStorage.setItem(LOCAL_PREFIXO+'relCampoData','${outro}')}catch(e){};render();return false;">Usar a ${outro==='data'?'data do ordenamento':'data de emissão'}</a></div>`;
 }
 function relNotasConferente(){ return currentUser ? (currentUser.nome || currentUser.usuario || '') : ''; }
 function relNotasTitulo(){ const d = relNotasEstado().departamento; return 'TRANSFERÊNCIA INTERSETORIAL - SMS'+(d?'/'+d.toUpperCase():'')+' PMJ'; }
@@ -2512,7 +2528,7 @@ function relNotasDocHTML(itens){
   const codigos = D ? Array.from(new Set(rs.filter(y=>y.t.pct).map(y=>y.t.cod))).sort().map(c=>{ const n = retNatureza(c); return `${c} = IR ${fmtPct(n.ir)}%`; }) : [];
   return `<div class="rn-doc${D?' rn-larga':''}">
     <div class="rn-tit"><span>${esc(relNotasTitulo())}</span><span>NOTAS FISCAIS</span></div>
-    <div class="rn-sub">${carimbo}${R.de||R.ate?` &nbsp;·&nbsp; Emissão de ${R.de?fmtDateBR(R.de):'…'} a ${R.ate?fmtDateBR(R.ate):'…'}`:''}</div>
+    <div class="rn-sub">${carimbo}${R.de||R.ate?` &nbsp;·&nbsp; ${relPeriodoRotulo(true)} de ${R.de?fmtDateBR(R.de):'…'} a ${R.ate?fmtDateBR(R.ate):'…'}`:''}</div>
     <div class="rn-dep"><b>ENCAMINHAR PARA:</b> ${R.departamento?"<b>DEPARTAMENTO DE "+esc(R.departamento.toUpperCase())+"</b>":"______________________________"}</div>
     <table class="rn-tab"><thead>${cab}</thead>
     <tbody>${rs.map(linha).join('') || `<tr><td colspan="${ncol}" style="text-align:center;">Nenhuma nota no período.</td></tr>`}</tbody>
@@ -2529,20 +2545,22 @@ function viewRelacaoNotas(){
   const deptos = lista('departamentos');
   const rs = itens.map(retencaoItem), totLiq = r2(rs.reduce((s,t)=>s+t.liq,0)), totDesc = r2(rs.reduce((s,t)=>s+t.desc,0));
   // consulta automática ao Simples ao abrir / trocar o período (só quem ainda não foi consultado hoje)
-  const chaveAuto = R.descontar ? [R.de,R.ate,R.area,R.situacao,itens.length].join('|') : '';
+  const chaveAuto = R.descontar ? [R.campoData,R.de,R.ate,R.area,R.situacao,itens.length].join('|') : '';
   if(chaveAuto && R.autoFeito!==chaveAuto && !R.consultando){ R.autoFeito = chaveAuto; setTimeout(()=>consultarSimplesRelacao(false, true), 50); }
   return `<div class="card no-print">
     <h2>📋 Relação de notas ordenadas</h2>
-    <div class="subtitle">Lista as notas ordenadas pela <b>data de emissão</b> dentro do período, para enviar ao departamento escolhido em “Enviar para”. “Conferido” sai com o nome de quem está logado. Os departamentos são cadastrados em Cadastros → Listas de opções.</div>
+    <div class="subtitle">Lista as notas cuja <b>${R.campoData==='emissao'?'data de emissão':'data do ordenamento'}</b> está dentro do período (escolha em “Data considerada”), para enviar ao departamento escolhido em “Enviar para”. “Conferido” sai com o nome de quem está logado. Os departamentos são cadastrados em Cadastros → Listas de opções.</div>
     <div class="filtros" style="margin-top:10px;">
-      <div class="field"><label>Período inicial (emissão)</label><input type="date" value="${esc(R.de)}" onchange="relNotas.de=this.value;render()"></div>
-      <div class="field"><label>Período final (emissão)</label><input type="date" value="${esc(R.ate)}" onchange="relNotas.ate=this.value;render()"></div>
+      <div class="field"><label>Data considerada</label><select onchange="relNotas.campoData=this.value;try{localStorage.setItem(LOCAL_PREFIXO+'relCampoData',this.value)}catch(e){};render()"><option value="data" ${R.campoData!=='emissao'?'selected':''}>Data do ordenamento</option><option value="emissao" ${R.campoData==='emissao'?'selected':''}>Data de emissão da NF</option></select></div>
+      <div class="field"><label>Período inicial</label><input type="date" value="${esc(R.de)}" onchange="relNotas.de=this.value;render()"></div>
+      <div class="field"><label>Período final</label><input type="date" value="${esc(R.ate)}" onchange="relNotas.ate=this.value;render()"></div>
       <div class="field"><label>Enviar para (departamento)</label><select onchange="relNotas.departamento=this.value;try{localStorage.setItem(LOCAL_PREFIXO+'relDepto',this.value)}catch(e){};render()"><option value="">—</option>${deptos.map(d=>`<option ${R.departamento===d?'selected':''}>${esc(d)}</option>`).join('')}${R.departamento&&!deptos.includes(R.departamento)?`<option selected>${esc(R.departamento)}</option>`:''}</select></div>
       <div class="field"><label>Área</label><select onchange="relNotas.area=this.value;render()"><option value="">Todas</option>${lista('areas').map(a=>`<option ${R.area===a?'selected':''}>${esc(a)}</option>`).join('')}</select></div>
       <div class="field"><label>Situação</label><select onchange="relNotas.situacao=this.value;render()"><option value="">Todas (menos canceladas)</option>${SITUACOES.filter(s=>s.k!=='cancelada').map(s=>`<option value="${s.k}" ${R.situacao===s.k?'selected':''}>${s.n}</option>`).join('')}</select></div>
       <div class="field"><label>Conferido</label><input value="${esc(relNotasConferente())}" disabled></div>
       <div class="field"><label>Desconto (não optantes)</label><select onchange="relNotas.descontar=this.value==='1';try{localStorage.setItem(LOCAL_PREFIXO+'relDescontar',this.value)}catch(e){};render()"><option value="1" ${R.descontar?'selected':''}>Descontar IR (não optantes)</option><option value="0" ${R.descontar?'':'selected'}>Não aplicar — valor da NF</option></select></div>
     </div>
+    ${relForaDoPeriodoHTML()}
     ${R.departamento?`<div class="small-txt" style="margin:-2px 0 8px;">📧 E-mails do departamento ${esc(R.departamento)}: ${emailsDepto(R.departamento).length?`<b>${emailsDepto(R.departamento).map(esc).join(', ')}</b>`:'<b style="color:#8a5a1c">nenhum cadastrado</b>'} <a href="#" onclick="go('listas');return false;">(cadastrar/alterar em Listas de opções)</a></div>`:''}
     <div class="actions"><button class="btn" ${R.consultando?'disabled':''} onclick="imprimirRelacaoNotas()">🖨️ Imprimir relação</button><button class="btn secondary" ${R.consultando?'disabled':''} onclick="enviarRelacaoEmail()">📧 Enviar por e-mail</button><button class="btn secondary" ${R.consultando?'disabled':''} onclick="exportarRelacaoNotasExcel()">⭳ Excel</button>
       <span class="small-txt">${itens.length} de ${todas.length} nota(s) selecionada(s) · ${fmtMoney(itens.reduce((s,x)=>s+(Number(x.n.valor)||0),0))}${R.descontar?` · IR retido ${fmtMoney(totDesc)} · líquido <b>${fmtMoney(totLiq)}</b>`:''}${R.consultando?' · ⏳ consultando o Simples Nacional…':''}</span>
@@ -2610,7 +2628,7 @@ function perguntarEnvioRelacao(itens, aposImprimir){
   relEnvio = { itens, dep };
   const tot = r2(itens.reduce((s,x)=>s+retencaoItem(x).liq,0));
   abrirModal(`<h3>📧 ${aposImprimir?'Relação impressa. ':''}Deseja enviar a relação por e-mail?</h3>
-    <div>Relação de notas ordenadas para o <b>Departamento de ${esc(dep)}</b>: ${itens.length} nota(s)${R.de||R.ate?`, emissão de ${R.de?fmtDateBR(R.de):'…'} a ${R.ate?fmtDateBR(R.ate):'…'}`:''}, ${R.descontar?'líquido':'total'} <b>${fmtMoney(tot)}</b>.</div>
+    <div>Relação de notas ordenadas para o <b>Departamento de ${esc(dep)}</b>: ${itens.length} nota(s)${R.de||R.ate?`, ${relPeriodoRotulo()} de ${R.de?fmtDateBR(R.de):'…'} a ${R.ate?fmtDateBR(R.ate):'…'}`:''}, ${R.descontar?'líquido':'total'} <b>${fmtMoney(tot)}</b>.</div>
     <div style="margin-top:10px;"><b>Enviar para:</b>${emails.map(e=>`<label class="check" style="display:flex;gap:6px;align-items:center;margin-top:4px;"><input type="checkbox" class="relEnvioDest" value="${esc(e)}" checked> ${esc(e)}</label>`).join('')}</div>
     <div class="small-txt" style="margin-top:10px;">O Gmail abre numa nova aba com os destinatários, o assunto e a relação já preenchidos. Confira e clique em <b>Enviar</b>.</div>
     <div class="actions" style="margin-top:14px;"><button class="btn" onclick="confirmarEnvioRelacao(false)">✔ Sim, enviar</button><button class="btn secondary" onclick="relEnvio=null;fecharModal()">Não</button><button class="btn ghost small" onclick="confirmarEnvioRelacao(true)" title="Abre o programa de e-mail padrão do computador (Outlook etc.)">Usar outro programa de e-mail</button></div>`);
@@ -2618,7 +2636,7 @@ function perguntarEnvioRelacao(itens, aposImprimir){
 function relNotasEmailTexto(itens){
   const R = relNotasEstado(), D = R.descontar, ent = STATE.entidade || {};
   const agora = new Date(), quando = agora.toLocaleDateString('pt-BR')+' às '+pad2(agora.getHours())+':'+pad2(agora.getMinutes());
-  const periodo = R.de||R.ate ? `emissão de ${R.de?fmtDateBR(R.de):'…'} a ${R.ate?fmtDateBR(R.ate):'…'}` : 'todas as datas de emissão';
+  const periodo = R.de||R.ate ? `${relPeriodoRotulo()} de ${R.de?fmtDateBR(R.de):'…'} a ${R.ate?fmtDateBR(R.ate):'…'}` : 'todas as datas';
   const rs = itens.map(x=>({ x, t: retencaoItem(x) }));
   const tV = r2(rs.reduce((s,y)=>s+y.t.valor,0)), tD = r2(rs.reduce((s,y)=>s+y.t.desc,0)), tL = r2(rs.reduce((s,y)=>s+y.t.liq,0));
   const simp = t=>t.simples==='S'?'SIM':t.simples==='N'?'NÃO':t.simples==='PF'?'PF':'?';

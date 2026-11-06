@@ -523,7 +523,7 @@ function mostrarTelaRegras(){
    Criação: novembro/2026 (mês 1).
    ============================================================ */
 const APP_CRIACAO = { mes: 11, ano: 2026 };
-const APP_ALTERACAO = 8;
+const APP_ALTERACAO = 9;
 const APP_DATA = '2026-11-06';
 function appVersao(){
   const p = APP_DATA.split('-').map(Number);
@@ -1859,7 +1859,7 @@ function salvarRecurso(){
   if(!r.codAplicacao) r.codAplicacao = extrairCodAplic(r.componente+' '+r.programa);
   if(!STATE.exercicios.includes(r.exercicio)) STATE.exercicios.push(r.exercicio);
   saveState(); registrarAcao('Recurso salvo: '+recursoRotulo(r));
-  recursoEditId = null; recursoAbertoId = r.id; render(); showToast('Recurso salvo.','success');
+  recursoEditId = null; if(currentView!=='listas') recursoAbertoId = r.id; render(); showToast('Recurso salvo.','success');
 }
 function excluirRecurso(id){
   if(semPermissao('recursos')) return;
@@ -3252,8 +3252,44 @@ function excluirCredor(id){
 /* ============================================================
    LISTAS (opções dos campos) — o usuário cria e edita as próprias
    ============================================================ */
+/* ---- Recursos / fichas em Listas de opções (06/11/2026, 1.09): mesmo cadastro de
+   Recursos e fichas (STATE.recursos), só um atalho para incluir/editar os itens que
+   aparecem no campo "Recurso" do Ordenar nota. Não cria estrutura nova de dados. ---- */
+let filtroListaRec = { ano:'', area:'', txt:'', inativos:false };
+function recursosListaCardHTML(){
+  const ed = podeEditar('recursos'), f = filtroListaRec;
+  const anos = Array.from(new Set(STATE.recursos.map(r=>Number(r.exercicio)).filter(Boolean))).sort((a,b)=>b-a);
+  const ano = f.ano==='' ? exercicioSel : Number(f.ano)||0;
+  const t = normTxt(f.txt||'');
+  const recs = STATE.recursos.filter(r=>(!ano || Number(r.exercicio)===ano) && (!f.area || (r.area||'')===f.area) && (f.inativos || r.ativo!==false)
+    && (!t || normTxt([recursoRotulo(r), r.ficha, r.codAplicacao, r.componente, r.descricao].join(' ')).includes(t)))
+    .sort((a,b)=>(a.area||'').localeCompare(b.area||'') || recursoRotulo(a).localeCompare(recursoRotulo(b)));
+  const grupos = {}; recs.forEach(r=>{ const g = (r.exercicio||'')+' · '+(r.area||'Sem área'); (grupos[g] = grupos[g] || []).push(r); });
+  const linhas = Object.keys(grupos).sort().reverse().map(g=>`<tr><td colspan="3" style="background:var(--soft,#F1F6F8);font-weight:700;">${esc(g)}</td></tr>`+grupos[g].map(r=>{ const s = calcRecurso(r).saldo;
+    return `<tr style="${r.ativo===false?'opacity:.55;':''}"><td style="white-space:normal;">${esc(recursoRotulo(r))}${r.ativo===false?' <span class="badge neutro">inativo</span>':''}</td><td class="num nowrap ${s<0?'neg':''}">${fmtMoney(s)}</td>
+      <td class="nowrap" style="width:110px;">${ed?`<button class="btn ghost small" title="Editar" onclick="recursoEditId='${r.id}';render();window.scrollTo(0,0)">✏️</button><button class="btn ghost small" title="${r.ativo===false?'Reativar':'Inativar (deixa de aparecer no Ordenar nota)'}" onclick="alternarAtivoRecurso('${r.id}')">${r.ativo===false?'↺':'⏸'}</button>`:''}<button class="btn ghost small" title="Abrir extrato" onclick="abrirRecurso('${r.id}')">📄</button></td></tr>`; }).join('')).join('');
+  const sel = 'padding:7px 9px;border:1px solid var(--line);border-radius:7px;font-family:inherit;';
+  return `<div class="card"><h2>💰 Recursos / fichas (campo "Recurso" do Ordenar nota)</h2>
+    <div class="subtitle">É o mesmo cadastro de <b>Recursos e fichas</b>. O que for incluído aqui aparece na hora na lista de recursos ao ordenar uma nota.</div>
+    <div class="actions" style="margin-top:8px;flex-wrap:wrap;">
+      <select style="${sel}" onchange="filtroListaRec.ano=this.value;render()"><option value="0" ${ano===0?'selected':''}>Todos os exercícios</option>${anos.map(a=>`<option value="${a}" ${a===ano?'selected':''}>${a}</option>`).join('')}</select>
+      <select style="${sel}" onchange="filtroListaRec.area=this.value;render()"><option value="">Todas as áreas</option>${lista('areas').map(a=>`<option ${a===f.area?'selected':''}>${esc(a)}</option>`).join('')}</select>
+      <input id="flr_txt" style="${sel}flex:1;min-width:180px;" placeholder="Buscar ficha, código, nome…" value="${esc(f.txt||'')}" onkeydown="if(event.key==='Enter'){filtroListaRec.txt=this.value;render();}" onblur="if(this.value!==filtroListaRec.txt){filtroListaRec.txt=this.value;render();}">
+      <label style="display:flex;align-items:center;gap:5px;font-size:13px;"><input type="checkbox" ${f.inativos?'checked':''} onchange="filtroListaRec.inativos=this.checked;render()"> mostrar inativos</label>
+      ${ed?`<button class="btn small" onclick="recursoEditId='novo';render();window.scrollTo(0,0)">＋ Novo recurso / ficha</button>`:''}
+    </div>
+    <div class="table-wrap" style="max-height:380px;margin-top:8px;"><table><tbody>${linhas || '<tr><td class="small-txt">Nenhum recurso neste filtro.</td></tr>'}</tbody></table></div>
+    <div class="small-txt" style="margin-top:6px;">${recs.length} recurso(s). Inativar tira o recurso da lista do Ordenar nota sem apagar as notas já lançadas nele.</div>
+  </div>`;
+}
+function alternarAtivoRecurso(id){
+  if(semPermissao('recursos')) return; const r = getRecurso(id); if(!r) return;
+  r.ativo = r.ativo===false; saveState(); registrarAcao('Recurso '+(r.ativo?'reativado':'inativado')+': '+recursoRotulo(r)); render();
+}
 function viewListas(){
+  if(recursoEditId) return `<div class="actions" style="margin-bottom:10px;"><button class="btn secondary" onclick="recursoEditId=null;novoRecursoEmenda=null;render()">← Voltar às listas de opções</button></div>` + formRecursoHTML();
   return `<div class="helpbox">Estas listas aparecem como sugestão ao digitar nos campos do carimbo e dos cadastros. Você pode incluir, renomear, reordenar ou remover itens — remover um item <b>não</b> altera notas e modelos já gravados.</div>
+  ${recursosListaCardHTML()}
   ${tabelaRetencaoCardHTML()}
   ${deptosEmailsCardHTML()}
   <div class="grid cols-2">${Object.keys(ROTULOS_LISTAS).filter(k=>k!=='departamentos').map(k=>`<div class="card"><h2>${esc(ROTULOS_LISTAS[k])}</h2>

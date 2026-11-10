@@ -568,8 +568,8 @@ function mostrarTelaRegras(){
    Criação: novembro/2026 (mês 1).
    ============================================================ */
 const APP_CRIACAO = { mes: 11, ano: 2026 };
-const APP_ALTERACAO = 14;
-const APP_DATA = '2026-11-06';
+const APP_ALTERACAO = 15;
+const APP_DATA = '2026-11-10';
 function appVersao(){
   const p = APP_DATA.split('-').map(Number);
   const seqMes = (p[0] - APP_CRIACAO.ano)*12 + (p[1] - APP_CRIACAO.mes) + 1;
@@ -1356,8 +1356,88 @@ function lerFormNota(){
   notaDraft.modalidades = mods.filter(Boolean);
   if(notaDraft.credor){ const c = STATE.credores.find(x=>normTxt(x.nome)===normTxt(notaDraft.credor)); notaDraft.credorId = c ? c.id : ''; }
 }
+/* ---------------- Vencimento em feriado / fim de semana (1.15) ----------------
+   Feriados nacionais fixos + móveis (Páscoa), 9 de julho (SP) e a lista municipal
+   digitada em Entidade e carimbo → "Feriados municipais". Só avisa; nada é gravado
+   além do que o usuário escolher para o campo Vencimento. */
+const DIAS_SEMANA = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
+const FERIADOS_FIXOS = { '01-01':'Confraternização Universal', '04-21':'Tiradentes', '05-01':'Dia do Trabalho', '07-09':'Revolução Constitucionalista (feriado estadual SP)',
+  '09-07':'Independência do Brasil', '10-12':'Nossa Senhora Aparecida', '11-02':'Finados', '11-15':'Proclamação da República', '11-20':'Dia Nacional de Zumbi e da Consciência Negra', '12-25':'Natal' };
+function pascoaISO(ano){
+  const a = ano%19, b = Math.floor(ano/100), c = ano%100, d = Math.floor(b/4), e = b%4, f = Math.floor((b+8)/25), g = Math.floor((b-f+1)/3);
+  const h = (19*a+b-d-g+15)%30, i = Math.floor(c/4), k = c%4, l = (32+2*e+2*i-h-k)%7, m = Math.floor((a+11*h+22*l)/451);
+  const mes = Math.floor((h+l-7*m+114)/31), dia = ((h+l-7*m+114)%31)+1;
+  return ano+'-'+pad2(mes)+'-'+pad2(dia);
+}
+function feriadosMunicipaisLista(){
+  return String((STATE.entidade||{}).feriadosMunicipais||'').split(/\r?\n/).map(l=>{
+    const m = l.trim().match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?\s*[-–—:]?\s*(.*)$/);
+    return m ? { dm: pad2(m[2])+'-'+pad2(m[1]), ano: m[3]?Number(m[3]):null, nome: m[4].trim()||'Feriado municipal' } : null;
+  }).filter(Boolean);
+}
+function feriadoDoDia(iso){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(iso||''))) return '';
+  const ano = Number(iso.slice(0,4)), dm = iso.slice(5);
+  const mun = feriadosMunicipaisLista().find(x=>x.dm===dm && (!x.ano || x.ano===ano));
+  if(mun) return mun.nome+' (feriado municipal)';
+  if(FERIADOS_FIXOS[dm]) return FERIADOS_FIXOS[dm];
+  const p = pascoaISO(ano);
+  const moveis = { [somarDiasISO(p,-48)]:'Carnaval (segunda-feira, ponto facultativo)', [somarDiasISO(p,-47)]:'Carnaval (terça-feira, ponto facultativo)',
+    [somarDiasISO(p,-2)]:'Sexta-feira Santa (Paixão de Cristo)', [p]:'Páscoa', [somarDiasISO(p,60)]:'Corpus Christi (ponto facultativo)' };
+  return moveis[iso] || '';
+}
+/* Devolve '' se for dia útil; senão o motivo ("sábado", "domingo", "Natal"...). */
+function motivoDiaNaoUtil(iso){
+  const d = isoParaData(iso); if(!d) return '';
+  const fer = feriadoDoDia(iso), dow = d.getDay();
+  if(fer) return 'feriado: '+fer+(dow===0||dow===6?' — e cai num '+DIAS_SEMANA[dow]:'');
+  if(dow===0 || dow===6) return 'final de semana ('+DIAS_SEMANA[dow]+')';
+  return '';
+}
+function diaUtilProximo(iso, passo){ let d = iso; for(let i=0;i<30;i++){ d = somarDiasISO(d, passo); if(!motivoDiaNaoUtil(d)) return d; } return ''; }
+function fmtDiaSemanaBR(iso){ const d = isoParaData(iso); return d ? fmtDateBR(iso)+' ('+DIAS_SEMANA[d.getDay()]+')' : ''; }
+let vencAvisoValor = '';      // última data já avisada (não repete o aviso para a mesma data)
+let vencAvisoTimer = null;
+function vencHintHTML(iso){ const m = motivoDiaNaoUtil(iso); return m ? `<div class="hint" style="color:#b45309;font-weight:700;">⚠️ ${esc(m.charAt(0).toUpperCase()+m.slice(1))}</div>` : ''; }
+function vencAgendarChecagem(el){ clearTimeout(vencAvisoTimer); vencAvisoTimer = setTimeout(()=>vencChecar(el), 900); }
+function vencChecar(el){
+  clearTimeout(vencAvisoTimer);
+  const v = el && el.value; if(!v || Number(v.slice(0,4))<2000) return;
+  if(v===vencAvisoValor) return;
+  const motivo = motivoDiaNaoUtil(v); if(!motivo) return;
+  vencAvisoValor = v;
+  const prox = diaUtilProximo(v, 1), ant = diaUtilProximo(v, -1);
+  abrirModal(`<h3>⚠️ Vencimento em dia não útil</h3>
+    <p style="margin:0 0 6px;">A data de vencimento <b>${esc(/^final/.test(motivo) ? fmtDateBR(v) : fmtDiaSemanaBR(v))}</b> é <b>${esc(motivo)}</b>.</p>
+    <p class="muted" style="margin:0 0 14px;">Deseja manter esta data ou trocar por outra?</p>
+    <div id="vencTrocaBox" style="display:none;margin:0 0 14px;padding:12px;border:1px solid var(--line);border-radius:10px;background:#f8fafc;">
+      <div class="actions" style="margin-bottom:10px;flex-wrap:wrap;">
+        ${prox?`<button class="btn small" onclick="vencAplicar('${prox}')">➡️ Próximo dia útil: ${esc(fmtDiaSemanaBR(prox))}</button>`:''}
+        ${ant?`<button class="btn secondary small" onclick="vencAplicar('${ant}')">⬅️ Dia útil anterior: ${esc(fmtDiaSemanaBR(ant))}</button>`:''}
+      </div>
+      <div class="actions" style="align-items:flex-end;flex-wrap:wrap;">
+        <div class="field" style="margin:0;"><label>Ou escolha outra data</label><input type="date" id="vencOutraData" value="${esc(v)}"></div>
+        <button class="btn secondary small" onclick="vencAplicar(document.getElementById('vencOutraData').value)">Usar esta data</button>
+      </div>
+    </div>
+    <div class="actions" style="justify-content:flex-end;">
+      <button class="btn secondary" onclick="fecharModal()">✔️ Manter ${esc(fmtDateBR(v))}</button>
+      <button class="btn" id="vencBtnTrocar" onclick="document.getElementById('vencTrocaBox').style.display='block';this.style.display='none';">🔄 Trocar</button>
+    </div>`);
+}
+function vencAplicar(iso){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(iso||''))){ showToast('Informe uma data válida.','error'); return; }
+  fecharModal();
+  const el = document.querySelector('#formNota [data-f="vencimento"]');
+  if(el) el.value = iso;
+  if(notaDraft) notaDraft.vencimento = iso;
+  atualizarPreviewNota();
+  if(el && motivoDiaNaoUtil(iso)) vencChecar(el);   // a nova data também não é útil → avisa de novo
+  else showToast('Vencimento alterado para '+fmtDiaSemanaBR(iso)+'.','success');
+}
 function atualizarPreviewNota(){
   lerFormNota();
+  const vh = document.getElementById('vencHint'); if(vh && notaDraft) vh.innerHTML = vencHintHTML(notaDraft.vencimento);
   const p = document.getElementById('previewNota'); if(p) p.innerHTML = carimboHTML(Object.assign({}, notaDraft, { numero: notaDraft.numero || proximoNumero(Number((notaDraft.data||hojeISO()).slice(0,4))), ano: Number((notaDraft.data||hojeISO()).slice(0,4)) }));
   const s = document.getElementById('saldoNota'); if(s) s.innerHTML = saldoNotaHTML();
   ajustarEscalaPreview();
@@ -1431,7 +1511,7 @@ function viewOrdenar(){
             <div class="field"><label>Nº da NF</label><input data-f="nf" value="${esc(n.nf)}" oninput="atualizarPreviewNota()" id="campoNF"></div>
             <div class="field"><label>Data de emissão</label><input type="date" data-f="emissao" value="${esc(n.emissao)}" oninput="atualizarPreviewNota()"></div>
             <div class="field"><label>Valor da NF (R$)</label><input class="valor" data-f="valor" value="${Number(n.valor)?fmtNumBR(n.valor):''}" placeholder="0,00" onblur="formatarValorCampo(this)" oninput="atualizarPreviewNota()"></div>
-            <div class="field"><label>Vencimento</label><input type="date" data-f="vencimento" value="${esc(n.vencimento)}" oninput="atualizarPreviewNota()"></div>
+            <div class="field"><label>Vencimento</label><input type="date" data-f="vencimento" value="${esc(n.vencimento)}" oninput="atualizarPreviewNota()" onchange="vencAgendarChecagem(this)" onblur="vencChecar(this)"><div id="vencHint">${vencHintHTML(n.vencimento)}</div></div>
             <div class="field"><label>Data do ordenamento</label><input type="date" data-f="data" value="${esc(n.data)}" oninput="atualizarPreviewNota()"></div>
             <div class="field"><label>Mês de referência</label><input type="month" data-f="referencia" value="${esc(n.referencia)}"><div class="hint">Competência do serviço (opcional)</div></div>
             <div class="field half"><label>Credor (fornecedor)</label><input data-f="credor" list="dl_credores" value="${esc(n.credor)}" oninput="atualizarPreviewNota()" onchange="credorEscolhido()"></div>
@@ -3982,6 +4062,7 @@ function viewEntidade(){
       <div class="formgrid">
         ${f('vencDiasPadrao','Vencimento padrão (dias)','','number')}${f('alertaVencDias','Avisar notas a vencer em (dias)','','number')}
         ${f('alertaContratoDias','Avisar contratos vencendo em (dias)','','number')}${f('alertaSaldoPct','Avisar recurso abaixo de (% do saldo)','','number')}
+        <div class="field wide"><label>Feriados municipais (um por linha: dd/mm Nome — ou dd/mm/aaaa para um ano só)</label><textarea id="en_feriadosMunicipais" rows="3" placeholder="Ex.: 15/08 Padroeira&#10;03/03/2027 Ponto facultativo">${esc(e.feriadosMunicipais||'')}</textarea><div class="hint">O aviso de vencimento em Ordenar nota já conhece os feriados nacionais, a Sexta-feira Santa, Carnaval, Corpus Christi e o 9 de julho (SP).</div></div>
       </div>
       <div class="actions" style="margin-top:12px;"><button class="btn" onclick="salvarEntidade()">💾 Salvar</button></div>
     </div></div>
@@ -3992,6 +4073,7 @@ function salvarEntidade(){
   const e = STATE.entidade;
   ['titulo','prefeitura','secretaria','fundo','responsavelPadrao','item1','item2'].forEach(k=>e[k] = valCampo('en_'+k));
   ['vencDiasPadrao','alertaVencDias','alertaContratoDias','alertaSaldoPct'].forEach(k=>e[k] = Number(valCampo('en_'+k))||0);
+  e.feriadosMunicipais = valCampo('en_feriadosMunicipais');
   e.mostrarValor = document.getElementById('en_mostrarValor').checked; e.mostrarNumero = document.getElementById('en_mostrarNumero').checked;
   saveState(); registrarAcao('Entidade/carimbo alterado'); render(); showToast('Configuração salva.','success');
 }

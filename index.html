@@ -568,8 +568,8 @@ function mostrarTelaRegras(){
    Criação: novembro/2026 (mês 1).
    ============================================================ */
 const APP_CRIACAO = { mes: 11, ano: 2026 };
-const APP_ALTERACAO = 15;
-const APP_DATA = '2026-11-10';
+const APP_ALTERACAO = 16;
+const APP_DATA = '2026-11-11';
 function appVersao(){
   const p = APP_DATA.split('-').map(Number);
   const seqMes = (p[0] - APP_CRIACAO.ano)*12 + (p[1] - APP_CRIACAO.mes) + 1;
@@ -585,7 +585,13 @@ function localGravar(chave, obj){ try{ localStorage.setItem(LOCAL_PREFIXO+chave,
 /* ============================================================
    USUÁRIOS / LOGIN / LOG DE ACESSO (mesmo modelo dos outros sistemas)
    Perfis:
-   - master:   acesso total (inclusive Entidade, Usuários e Backup).
+   - admmaster: ADMINISTRADOR MASTER (1.16) — tudo o que o administrador faz e,
+               só ele, a tela "Limpeza e formatação" (apagar os dados por
+               módulo ou formatar o aplicativo inteiro). O usuário joao é
+               sempre Administrador Master; só um Administrador Master dá
+               ou tira esse perfil e altera o cadastro de outro.
+   - master:   ADMINISTRADOR — acesso total (inclusive Entidade, Usuários e
+               Backup), menos a tela "Limpeza e formatação".
    - operador: ordena notas, lança empenhos, entradas, contratos, modelos
                e credores. Não mexe em Usuários nem no Backup.
    - comum:    vê, imprime e exporta — não altera nada.
@@ -596,12 +602,16 @@ let USERS_STATE = { usuarios: [], logs: [] };
 let currentUser = null;
 let currentLogEntry = null;
 let usersLoaded = false;
-const VIEWS_SO_MASTER = ['usuarios','entidade','backup'];
+const VIEWS_SO_MASTER = ['usuarios','entidade','backup','limpeza'];
 function perfilAtual(){ return currentUser ? (currentUser.perfil || 'comum') : null; }
-function isMaster(){ return perfilAtual()==='master'; }
+/* isMaster = tem os poderes de administrador (Administrador OU Administrador Master) */
+function isMaster(){ const p = perfilAtual(); return p==='master' || p==='admmaster'; }
+function isAdmMaster(){ return perfilAtual()==='admmaster'; }
+function perfilEhAdmin(p){ return p==='master' || p==='admmaster'; }
 function podeEditar(view){
   const p = perfilAtual();
-  if(p==='master') return true;
+  if(p==='admmaster') return true;
+  if(p==='master') return (view || currentView)!=='limpeza';
   if(p==='operador') return !VIEWS_SO_MASTER.includes(view || currentView);
   return false;
 }
@@ -610,7 +620,7 @@ function semPermissao(view){
   showToast('Seu perfil de acesso não permite inserir, alterar ou excluir dados aqui — apenas visualizar e imprimir.', 'warning');
   return true;
 }
-function perfilLabel(p){ return p==='master' ? 'Administrador' : p==='operador' ? 'Operador' : 'Usuário comum'; }
+function perfilLabel(p){ return p==='admmaster' ? 'Administrador Master' : p==='master' ? 'Administrador' : p==='operador' ? 'Operador' : 'Usuário comum'; }
 async function hashSenha(senha){
   try{
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(senha)));
@@ -644,9 +654,11 @@ function garantirUsuarioMaster(){
     if(!u.id){ u.id = uid(); mudou = true; }
     if(!u.perfil){ u.perfil = 'comum'; mudou = true; }
     if(u.ativo===undefined){ u.ativo = true; mudou = true; }
+    /* 1.16: o administrador principal (joao) passa a Administrador Master — só o perfil muda, nada mais do cadastro */
+    if(u.usuario==='joao' && u.perfil!=='admmaster'){ u.perfil = 'admmaster'; mudou = true; }
   });
   if(!USERS_STATE.usuarios.some(u=>u.usuario==='joao')){
-    USERS_STATE.usuarios.push({ id: uid(), usuario:'joao', nome:'João', perfil:'master', senhaHash: MASTER_HASH, bloqueado:false, ativo:true, criadoEm:new Date().toISOString() });
+    USERS_STATE.usuarios.push({ id: uid(), usuario:'joao', nome:'João', perfil:'admmaster', senhaHash: MASTER_HASH, bloqueado:false, ativo:true, criadoEm:new Date().toISOString() });
     mudou = true;
   }
   if(mudou) saveUsersState(true);
@@ -675,7 +687,7 @@ function esqueciMinhaSenha(){
   if(!Array.isArray(USERS_STATE.solicitacoesSenha)) USERS_STATE.solicitacoesSenha = [];
   USERS_STATE.solicitacoesSenha.push(pedido);
   saveUsersState(true);
-  const emailsAdmins = USERS_STATE.usuarios.filter(x=>x.perfil==='master' && x.email).map(x=>x.email);
+  const emailsAdmins = USERS_STATE.usuarios.filter(x=>perfilEhAdmin(x.perfil) && x.email).map(x=>x.email);
   if(!emailsAdmins.length){ showToast('Pedido registrado no sistema, mas nenhum e-mail de administrador está cadastrado ainda (módulo Usuários) para receber o aviso por e-mail.','warning'); return; }
   const assunto = encodeURIComponent('Solicitação de nova senha — Ordenamento de Despesas');
   const corpo = encodeURIComponent(
@@ -1244,7 +1256,7 @@ function viewPainel(){
   const porArea = {};
   calcs.forEach(x=>{ const a = x.r.area || 'Sem área'; const o = porArea[a] = porArea[a] || { disp:0, ord:0, saldo:0 }; o.disp += x.c.disponivel; o.ord += x.c.ordenado; o.saldo += x.c.saldo; });
   return `
-    ${!STATE.seedImportado && !STATE.recursos.length && !STATE.modelos.length ? `<div class="alerta-aviso"><b>Primeiro acesso:</b> o sistema está vazio. ${isMaster()?`<button class="btn small" style="margin-left:8px;" onclick="go('backup')">📥 Carregar os dados das planilhas</button>`:'Peça ao administrador para carregar os dados iniciais das planilhas.'}</div>`:''}
+    ${STATE.formatadoEm && !STATE.recursos.length && !STATE.modelos.length ? `<div class="alerta-aviso"><b>Sistema formatado</b> em ${esc(new Date(STATE.formatadoEm).toLocaleString('pt-BR'))}: comece por Administração → Entidade e carimbo, depois Cadastros (Credores, Modelos de carimbo, Listas de opções) e Recursos e fichas.</div>` : !STATE.seedImportado && !STATE.recursos.length && !STATE.modelos.length ? `<div class="alerta-aviso"><b>Primeiro acesso:</b> o sistema está vazio. ${isMaster()?`<button class="btn small" style="margin-left:8px;" onclick="go('backup')">📥 Carregar os dados das planilhas</button>`:'Peça ao administrador para carregar os dados iniciais das planilhas.'}</div>`:''}
     <div class="grid cols-4" style="margin-bottom:18px;">
       <div class="stat"><div class="label">Ordenado no mês</div><div class="value">${fmtMoney(totalMes)}</div><div class="hint">${notasMes.length} nota(s) em ${MESES[Number(mesAtual.slice(5,7))-1]}</div></div>
       <div class="stat"><div class="label">Ordenado em ${ano}</div><div class="value">${fmtMoney(totalAno)}</div><div class="hint">${notas.length} nota(s) lançadas no sistema</div></div>
@@ -4101,17 +4113,17 @@ function viewUsuarios(){
     <div class="formgrid">
       <div class="field"><label>Usuário (login)</label><input id="us_usuario" value="${esc(ed.usuario)}" ${ed.id?'disabled':''}></div>
       <div class="field"><label>Nome</label><input id="us_nome" value="${esc(ed.nome||'')}"></div>
-      <div class="field"><label>Perfil</label><select id="us_perfil">${['master','operador','comum'].map(p=>`<option value="${p}" ${ed.perfil===p?'selected':''}>${perfilLabel(p)}</option>`).join('')}</select></div>
+      <div class="field"><label>Perfil</label><select id="us_perfil">${(isAdmMaster()?['admmaster','master','operador','comum']:['master','operador','comum']).map(p=>`<option value="${p}" ${ed.perfil===p?'selected':''}>${perfilLabel(p)}</option>`).join('')}</select></div>
       <div class="field"><label>${ed.id?'Nova senha (em branco = manter)':'Senha'}</label><input id="us_senha" type="password" autocomplete="new-password"></div>
       <div class="field half"><label>E-mail</label><input id="us_email" value="${esc(ed.email||'')}"></div>
       <div class="field"><label>Situação</label><select id="us_ativo"><option value="1">Ativo</option><option value="0" ${ed.ativo===false?'selected':''}>Inativo</option></select></div>
     </div>
-    <div class="helpbox" style="margin-top:10px;"><b>Administrador:</b> tudo. <b>Operador:</b> ordena notas, lança empenhos, entradas, contratos, modelos, credores e listas. <b>Usuário comum:</b> só consulta e imprime.</div>
+    <div class="helpbox" style="margin-top:10px;"><b>Administrador Master:</b> tudo, inclusive a tela “Limpeza e formatação” (só ele dá ou tira este perfil). <b>Administrador:</b> tudo, menos a Limpeza e formatação. <b>Operador:</b> ordena notas, lança empenhos, entradas, contratos, modelos, credores e listas. <b>Usuário comum:</b> só consulta e imprime.</div>
     <div class="actions"><button class="btn" onclick="salvarUsuario()">💾 Salvar</button><button class="btn secondary" onclick="usuarioEditId=null;render()">Cancelar</button></div></div>`:''}
   <div class="card"><div class="flexrow"><h2>👥 Usuários</h2><button class="btn" onclick="usuarioEditId='novo';render()">＋ Novo usuário</button></div>
     <div class="table-wrap" style="margin-top:10px;"><table><thead><tr><th>Usuário</th><th>Nome</th><th>Perfil</th><th>Situação</th><th></th></tr></thead>
     <tbody>${USERS_STATE.usuarios.map(u=>`<tr><td><b>${esc(u.usuario)}</b></td><td>${esc(u.nome||'')}</td><td>${perfilLabel(u.perfil)}</td><td>${u.bloqueado?'<span class="badge inativo">bloqueado</span>':u.ativo===false?'<span class="badge neutro">inativo</span>':'<span class="badge ok">ativo</span>'}</td>
-      <td class="nowrap"><button class="btn ghost small" onclick="usuarioEditId='${u.id}';render()">✏️</button>${u.bloqueado?`<button class="btn ghost small" onclick="desbloquearUsuario('${u.id}')">🔓 desbloquear</button>`:''}</td></tr>`).join('')}</tbody></table></div></div>
+      <td class="nowrap">${u.perfil==='admmaster' && !isAdmMaster()?'<span class="small-txt" title="Só um Administrador Master altera este usuário">🔒</span>':`<button class="btn ghost small" onclick="usuarioEditId='${u.id}';render()">✏️</button>`}${u.bloqueado?`<button class="btn ghost small" onclick="desbloquearUsuario('${u.id}')">🔓 desbloquear</button>`:''}</td></tr>`).join('')}</tbody></table></div></div>
   ${(USERS_STATE.solicitacoesSenha||[]).length?`<div class="card"><h2>🔑 Pedidos de nova senha</h2>
     <div class="subtitle">Feitos pelo link “Esqueci minha senha” da tela de acesso. Cadastre uma senha nova para o usuário (✏️ acima) e depois marque o pedido como atendido.</div>
     <div class="table-wrap"><table><thead><tr><th>Data/hora</th><th>Usuário</th><th>Nome</th><th>Perfil</th><th></th></tr></thead>
@@ -4132,8 +4144,11 @@ async function salvarUsuario(){
     if(senha.length<4){ showToast('A senha precisa ter pelo menos 4 caracteres.','warning'); return; }
   }
   const u = novo ? { id: uid(), usuario, criadoEm:new Date().toISOString(), bloqueado:false } : USERS_STATE.usuarios.find(x=>x.id===usuarioEditId);
-  u.nome = valCampo('us_nome'); u.perfil = valCampo('us_perfil'); u.email = valCampo('us_email'); u.ativo = valCampo('us_ativo')!=='0';
-  if(u.usuario==='joao' && (u.perfil!=='master' || !u.ativo)){ showToast('O administrador principal não pode perder o perfil de administrador.','warning'); u.perfil = 'master'; u.ativo = true; }
+  if(!u) return;
+  const perfilNovo = valCampo('us_perfil');
+  if(!isAdmMaster() && (u.perfil==='admmaster' || perfilNovo==='admmaster')){ showToast('Só um Administrador Master altera o cadastro de um Administrador Master ou dá esse perfil.','warning'); return; }
+  u.nome = valCampo('us_nome'); u.perfil = perfilNovo; u.email = valCampo('us_email'); u.ativo = valCampo('us_ativo')!=='0';
+  if(u.usuario==='joao' && (u.perfil!=='admmaster' || !u.ativo)){ showToast('O administrador principal (joao) não pode perder o perfil de Administrador Master.','warning'); u.perfil = 'admmaster'; u.ativo = true; }
   if(senha) u.senhaHash = await hashSenha(senha);
   if(novo) USERS_STATE.usuarios.push(u);
   saveUsersState(true); registrarAcao('Usuário salvo: '+u.usuario); usuarioEditId = null; render(); showToast('Usuário salvo.','success');
@@ -4151,7 +4166,8 @@ function viewBackup(){
       <div class="subtitle">Copiados de <b>(EM USO) Carimbo Ordenador.xlsx</b> e <b>ORDENAMENTO 2026 SALDO 04.11.2026.xlsx</b>: ${seed?`${seed.modelos.length} modelos de carimbo, ${seed.credores.length} credores (aba BCC), ${seed.recursos.length} recursos/fichas com os gastos já ordenados e ${seed.contratos.length} contratos`:'(não disponível)'}.</div>
       ${STATE.seedImportado?`<div class="alerta-ok">Carregados em ${new Date(STATE.seedImportado).toLocaleString('pt-BR')}. Carregar de novo só inclui o que estiver faltando — nada do que já existe é alterado.</div>`:''}
       <div class="helpbox">Como fica cada linha das abas de ordenamento: <b>saldo inicial</b> = coluna “Saldo”; <b>entradas</b> = “Receitas adicionais” e “Entradas”; cada valor somado em “Gastos ordenados” vira um gasto da planilha (sem data); “Valores empenhados até a data” entra como gasto consolidado. Quando a conta não bate com o “Saldo Projetado” da planilha (há fórmulas diferentes entre as linhas), o sistema lança um <b>ajuste de conferência</b> para o saldo ficar igual ao da planilha em 04/11/2026.</div>
-      <button class="btn" onclick="importarDadosPlanilhas()" ${seed?'':'disabled'}>📥 Carregar dados das planilhas</button>
+      ${STATE.formatadoEm?`<div class="alerta-aviso">O aplicativo foi <b>formatado</b> em ${esc(new Date(STATE.formatadoEm).toLocaleString('pt-BR'))} (Administração → Limpeza e formatação). Os dados das planilhas acima são os de Jaborandi — só carregue se for mesmo essa a Secretaria.</div>`:''}
+      <button class="btn${STATE.formatadoEm?' secondary':''}" onclick="importarDadosPlanilhas()" ${seed?'':'disabled'}>📥 Carregar dados das planilhas</button>
     </div>
     <div class="card"><h2>💾 Cópia de segurança</h2>
       <div class="subtitle">Baixa um arquivo com todos os cadastros e lançamentos. Guarde em local seguro.</div>
@@ -4204,6 +4220,7 @@ function limparTexto(s){ return String(s||'').replace(/\s+/g,' ').trim(); }
 function importarDadosPlanilhas(){
   if(!isMaster()) return;
   const S = window.SEED_PLANILHAS; if(!S) return;
+  if(STATE.formatadoEm && !confirm('ATENÇÃO: este aplicativo foi FORMATADO em '+new Date(STATE.formatadoEm).toLocaleString('pt-BR')+'.\n\nOs dados das planilhas embutidos no aplicativo são os da Secretaria Municipal de Saúde de Jaborandi (planilhas de 04/11/2026). Carregar mesmo assim?')) return;
   if(!confirm('Carregar os dados das planilhas? Só será incluído o que ainda não existe no sistema.')) return;
   const cont = { credores:0, modelos:0, recursos:0, contratos:0, lanc:0 };
   const porOrigem = (lst, o)=>lst.find(x=>x.origem===o);
@@ -4302,6 +4319,189 @@ function importarDadosPlanilhas(){
 }
 
 /* ============================================================
+   LIMPEZA E FORMATAÇÃO (1.16) — só o ADMINISTRADOR MASTER
+   Apaga de uma vez os dados de um módulo ou submódulo (ex.: todos os
+   credores, todos os modelos de carimbo) ou FORMATA o aplicativo inteiro,
+   deixando o banco limpo para outra Secretaria / outro setor cadastrar os
+   próprios dados. Nada é apagado sem que o Administrador Master:
+   (1) marque o que quer apagar, (2) digite a palavra de confirmação e a
+   senha dele; e antes de apagar o sistema baixa um backup completo (.json).
+   ============================================================ */
+const LIMP_PALAVRA = 'APAGAR', FORMAT_PALAVRA = 'FORMATAR';
+let limpSel = new Set();
+let limpListasModo = 'vazias';
+function limpNoPIS(){ return !!window.__PIS_APP; }   /* dentro do PIS os usuários e o log são os do PIS */
+function limpMovDe(f){ return movTodos().filter(f); }
+function limpAnexosRec(){ const l = []; STATE.recursos.forEach(r=>(r.anexos||[]).forEach(a=>l.push(a))); return l; }
+function limpAnexosCred(){ return STATE.credores.filter(c=>c.simplesPdf && c.simplesPdf.id).map(c=>c.simplesPdf); }
+function limpEntidadeEmBranco(){
+  const e = STATE.entidade || {};
+  return { titulo:'', prefeitura:'', secretaria:'', fundo:'', item1:'', item2:'', responsavelPadrao:'', vencDiasPadrao:10,
+    brasao:'', logo:'', mostrarValor: !!e.mostrarValor, mostrarNumero: e.mostrarNumero!==false, alertaSaldoPct:10, alertaVencDias:7, alertaContratoDias:60, feriadosMunicipais:'' };
+}
+function limpEntidadePreenchida(){ const e = STATE.entidade || {}; return ['titulo','prefeitura','secretaria','fundo','item1','item2','responsavelPadrao','feriadosMunicipais'].filter(k=>String(e[k]||'').trim()).length + (e.brasao?1:0) + (e.logo?1:0); }
+/* Catálogo: módulo → submódulos. n() = quantos registros há; limpar() = apaga (só na memória; a gravação vem depois). */
+function limpCatalogo(){
+  const movTipo = (t, hist)=>it=>it.tipo===t && (hist===undefined || !!it.historico===hist);
+  const apagaMov = f=>()=>{ limpMovDe(f).forEach(it=>{ const s = shard(it._k || chaveMov(it)); delete s.itens[it.id]; s.sujos.delete(it.id); s.excluidos.add(it.id); }); MOV_CACHE = null; };
+  const G = [
+    { mod:'Principal — Notas e empenhos', ic:'🧾', itens:[
+      { id:'notas', nome:'Notas ordenadas', desc:'Todas as notas ordenadas (carimbos emitidos), com situação, pagamento e retenções.', n:()=>limpMovDe(movTipo('nota',false)).length, limpar:apagaMov(movTipo('nota',false)) },
+      { id:'notasHist', nome:'Gastos trazidos das planilhas (sem data)', desc:'Os gastos das planilhas antigas que entraram em “Carregar dados das planilhas”.', n:()=>limpMovDe(movTipo('nota',true)).length, limpar:apagaMov(movTipo('nota',true)) },
+      { id:'seq', nome:'Numeração dos ordenamentos', desc:'A próxima nota volta a ser a nº 0001 de cada exercício (se ainda houver notas, o número continua depois da maior).', n:()=>Object.keys(STATE.seq||{}).length, limpar:()=>{ STATE.seq = {}; } },
+      { id:'empenhos', nome:'Empenhos', desc:'Empenhos globais, estimativos e ordinários.', n:()=>limpMovDe(movTipo('empenho')).length, limpar:apagaMov(movTipo('empenho')) },
+    ]},
+    { mod:'Controle — Recursos, período e contratos', ic:'💰', itens:[
+      { id:'recursos', nome:'Recursos e fichas', desc:'Fichas, convênios e emendas, com saldo inicial, balancete importado, vínculos de emenda e os PDFs anexados.', n:()=>STATE.recursos.length, limpar:()=>{ STATE.recursos = []; }, anexos:limpAnexosRec },
+      { id:'entradas', nome:'Entradas de recurso', desc:'Receitas e entradas lançadas nos recursos.', n:()=>limpMovDe(movTipo('entrada')).length, limpar:apagaMov(movTipo('entrada')) },
+      { id:'ajustes', nome:'Ajustes de saldo', desc:'Ajustes de conferência e de saldo dos recursos.', n:()=>limpMovDe(movTipo('ajuste')).length, limpar:apagaMov(movTipo('ajuste')) },
+      { id:'contratos', nome:'Contratos e atas', desc:'Contratos, atas e termos com vigência e valor.', n:()=>STATE.contratos.length, limpar:()=>{ STATE.contratos = []; } },
+      { id:'exercicios', nome:'Exercícios cadastrados', desc:'A lista de anos do seletor “Exercício” (fica só o ano atual).', n:()=>STATE.exercicios.filter(a=>a!==new Date().getFullYear()).length, limpar:()=>{ STATE.exercicios = [new Date().getFullYear()]; } },
+    ]},
+    { mod:'Cadastros — Modelos, credores e listas', ic:'🗂️', itens:[
+      { id:'modelos', nome:'Modelos de carimbo', desc:'Todos os modelos por credor/convênio (as abas da planilha do carimbo).', n:()=>STATE.modelos.length, limpar:()=>{ STATE.modelos = []; } },
+      { id:'credores', nome:'Credores', desc:'Banco de contas dos fornecedores, com CNPJ, Simples Nacional e os comprovantes de consulta anexados.', n:()=>STATE.credores.length, limpar:()=>{ STATE.credores = []; }, anexos:limpAnexosCred },
+      ...Object.keys(LISTAS_PADRAO).map(k=>({ id:'lista:'+k, nome:'Lista: '+(ROTULOS_LISTAS[k]||k), desc:'Opções dos campos ('+(ROTULOS_LISTAS[k]||k).toLowerCase()+').', lista:true,
+        n:()=>((STATE.listas||{})[k]||[]).length, limpar:()=>{ STATE.listas[k] = limpListasModo==='padrao' ? LISTAS_PADRAO[k].slice() : []; } })),
+      { id:'retencao', nome:'Tabela de retenção do IR (editada/importada)', desc:'Volta à tabela original do aplicativo (IN RFB 1.234/2012, Anexo I).', n:()=>STATE.retencaoTabela ? 1 : 0, limpar:()=>{ delete STATE.retencaoTabela; delete STATE.retencaoInfo; } },
+      { id:'emailsDeptos', nome:'E-mails dos departamentos', desc:'Endereços usados para enviar a relação de notas ordenadas.', n:()=>Object.keys(STATE.emailsDeptos||{}).length, limpar:()=>{ STATE.emailsDeptos = {}; } },
+    ]},
+    { mod:'Administração', ic:'🏛️', itens:[
+      { id:'entidade', nome:'Entidade e carimbo', desc:'Título, prefeitura, secretaria, fundo, textos dos ITENS 1 e 2, responsável, brasão, logo e feriados municipais (ficam em branco; prazos de alerta voltam ao padrão).', n:()=>limpEntidadePreenchida(), limpar:()=>{ STATE.entidade = limpEntidadeEmBranco(); } },
+      { id:'carimboIR', nome:'Textos dos carimbos de retenção do IR', desc:'Cabeçalho do carimbo dos não optantes e nota dos optantes (o decreto municipal fica em branco).', n:()=>STATE.carimboIR ? 1 : 0, limpar:()=>{ STATE.carimboIR = { titulo:CIR_PADRAO.titulo, linha1:CIR_PADRAO.linha1, linha2:'' }; } },
+    ]},
+  ];
+  if(!limpNoPIS()) G[3].itens.push(
+      { id:'usuarios', nome:'Usuários', desc:'Todos os usuários, MENOS os Administradores Master (o joao fica sempre).', n:()=>USERS_STATE.usuarios.filter(u=>u.perfil!=='admmaster').length, usuarios:true, limpar:()=>{ USERS_STATE.usuarios = USERS_STATE.usuarios.filter(u=>u.perfil==='admmaster'); } },
+      { id:'logs', nome:'Registro de acessos', desc:'O histórico de entradas e ações dos usuários (fica só a sessão atual).', n:()=>USERS_STATE.logs.filter(l=>l!==currentLogEntry).length, usuarios:true, limpar:()=>{ USERS_STATE.logs = USERS_STATE.logs.filter(l=>l===currentLogEntry); } },
+      { id:'pedidosSenha', nome:'Pedidos de nova senha', desc:'Pedidos feitos pelo “Esqueci minha senha”.', n:()=>(USERS_STATE.solicitacoesSenha||[]).length, usuarios:true, limpar:()=>{ USERS_STATE.solicitacoesSenha = []; } });
+  return G;
+}
+function limpItens(){ return limpCatalogo().reduce((l,g)=>l.concat(g.itens), []); }
+/* avisos de dados que ficariam "soltos" (ligados a algo que vai ser apagado) */
+function limpAvisos(sel){
+  const av = [], tem = id=>sel.has(id);
+  if(tem('recursos')){
+    const n = limpMovDe(it=>it.recursoId && !((it.tipo==='nota' && (it.historico?tem('notasHist'):tem('notas'))) || (it.tipo==='empenho' && tem('empenhos')) || (it.tipo==='entrada' && tem('entradas')) || (it.tipo==='ajuste' && tem('ajustes')))).length;
+    if(n) av.push(n+' lançamento(s) (notas, empenhos, entradas ou ajustes) que NÃO serão apagados estão ligados a recursos e ficarão sem recurso. Marque também esses submódulos para não deixar nada solto.');
+    const m = STATE.modelos.filter(x=>x.recursoId).length; if(m && !tem('modelos')) av.push(m+' modelo(s) de carimbo apontam para um recurso e ficarão sem recurso escolhido.');
+  }
+  if(tem('empenhos') && !tem('notas')){ const n = limpMovDe(it=>it.tipo==='nota' && it.empenhoId).length; if(n) av.push(n+' nota(s) ordenada(s) estão ligadas a empenhos e ficarão sem empenho.'); }
+  if(tem('contratos') && !tem('notas')){ const n = limpMovDe(it=>it.tipo==='nota' && it.contratoId).length; if(n) av.push(n+' nota(s) ordenada(s) estão ligadas a contratos e ficarão sem contrato.'); }
+  if(tem('credores') && !tem('modelos')){ const n = STATE.modelos.filter(x=>x.credorId).length; if(n) av.push(n+' modelo(s) de carimbo continuam com o nome e a conta do credor, mas sem o cadastro dele.'); }
+  if(tem('notas') && !tem('seq') && Object.keys(STATE.seq||{}).length) av.push('A numeração dos ordenamentos NÃO foi marcada: a próxima nota continua do número em que parou. Marque “Numeração dos ordenamentos” para recomeçar do 0001.');
+  return av;
+}
+function viewLimpeza(){
+  if(!isAdmMaster()) return '<div class="card">Acesso restrito ao Administrador Master.</div>';
+  const G = limpCatalogo();
+  const total = G.reduce((s,g)=>s+g.itens.reduce((t,i)=>t+i.n(),0),0);
+  const av = limpAvisos(limpSel);
+  const marcados = limpItens().filter(i=>limpSel.has(i.id));
+  return `
+  <div class="alerta-erro"><b>⚠️ Atenção — esta tela APAGA dados de verdade.</b> Ela serve para deixar o aplicativo (ou um módulo dele) limpo para outra Secretaria / outro setor cadastrar os próprios dados, por exemplo numa venda do aplicativo.
+    Antes de apagar, o sistema <b>baixa um backup completo</b> (.json) — guarde esse arquivo: com ele, Administração → Backup → “Restaurar backup” traz de volta os cadastros e lançamentos.
+    ${firebaseOk?' Peça para <b>todos os outros usuários fecharem o aplicativo</b> antes: quem estiver com ele aberto pode gravar de novo os dados antigos.':''}</div>
+  ${STATE.formatadoEm?`<div class="alerta-aviso">Última formatação completa: ${esc(new Date(STATE.formatadoEm).toLocaleString('pt-BR'))}${STATE.formatadoPor?' por '+esc(STATE.formatadoPor):''}.</div>`:''}
+  <div class="card"><div class="flexrow"><h2>🧹 Limpar por módulo e submódulo</h2>
+      <div class="actions" style="margin:0;"><button class="btn ghost small" onclick="limpMarcarTodos(true)">Marcar tudo</button><button class="btn ghost small" onclick="limpMarcarTodos(false)">Desmarcar tudo</button></div></div>
+    <div class="subtitle">Marque o módulo inteiro (caixa do título) ou só os submódulos que quer apagar. O número ao lado é quantos registros existem hoje.</div>
+    ${G.map((g,gi)=>{ const ids = g.itens.map(i=>i.id); const todos = ids.every(id=>limpSel.has(id)); const qtd = g.itens.reduce((s,i)=>s+i.n(),0);
+      return `<div style="border:1px solid #dde5e8;border-radius:10px;padding:10px 14px;margin-top:10px;">
+        <label class="check" style="font-weight:700;font-size:14px;"><input type="checkbox" ${todos?'checked':''} onchange="limpMarcarModulo(${gi}, this.checked)"> ${g.ic} ${esc(g.mod)} <span class="badge neutro" style="margin-left:6px;">${qtd}</span></label>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:6px 16px;margin:8px 0 0 22px;">
+        ${g.itens.map(i=>{ const n = i.n(); return `<label class="check" style="align-items:flex-start;${n?'':'opacity:.55;'}" title="${esc(i.desc)}"><input type="checkbox" ${limpSel.has(i.id)?'checked':''} onchange="limpMarcar('${escJs(i.id)}', this.checked)"> <span><b>${esc(i.nome)}</b> <span class="badge ${n?'ok':'neutro'}">${n}</span><br><span class="small-txt">${esc(i.desc)}</span></span></label>`; }).join('')}
+        </div>
+        ${g.itens.some(i=>i.lista)?`<div class="small-txt" style="margin:8px 0 0 22px;">Listas de opções, ao limpar: <label class="check" style="display:inline-flex;"><input type="radio" name="limpListas" ${limpListasModo==='vazias'?'checked':''} onchange="limpListasModo='vazias';render()"> deixar vazias</label> <label class="check" style="display:inline-flex;"><input type="radio" name="limpListas" ${limpListasModo==='padrao'?'checked':''} onchange="limpListasModo='padrao';render()"> voltar às opções que vêm com o aplicativo</label></div>`:''}
+      </div>`; }).join('')}
+    ${av.length?`<div class="alerta-aviso" style="margin-top:12px;"><b>Confira antes de apagar:</b><br>• ${av.map(esc).join('<br>• ')}</div>`:''}
+    <div class="actions" style="margin-top:12px;"><button class="btn" style="background:var(--red);border-color:var(--red);color:#fff;" onclick="limpConfirmar(false)" ${marcados.length?'':'disabled'}>🗑️ Apagar ${marcados.length} submódulo(s) marcado(s)</button></div>
+  </div>
+  <div class="card"><h2>💣 Formatar todo o aplicativo</h2>
+    <div class="subtitle">Apaga <b>todos</b> os dados do Ordenamento de Despesas (${total} registro(s) hoje): notas, empenhos, recursos, contratos, modelos, credores, listas de opções, entidade e carimbo${limpNoPIS()?'':', usuários (menos os Administradores Master) e o registro de acessos'}. A numeração volta ao nº 0001 e o banco fica limpo, pronto para outra Secretaria / outro setor.
+      ${limpNoPIS()?' Dentro do Programa Integrado de Saúde, só os dados deste módulo são apagados — os outros módulos e os usuários do PIS não mudam.':''}</div>
+    <div class="small-txt">As listas de opções seguem a escolha acima (${limpListasModo==='padrao'?'voltar às opções que vêm com o aplicativo':'deixar vazias'}).</div>
+    <div class="actions" style="margin-top:10px;"><button class="btn" style="background:#7a1d16;border-color:#7a1d16;color:#fff;" onclick="limpConfirmar(true)">💣 Formatar o aplicativo inteiro</button></div>
+  </div>`;
+}
+function limpMarcar(id, on){ if(on) limpSel.add(id); else limpSel.delete(id); render(); }
+function limpMarcarModulo(gi, on){ const g = limpCatalogo()[gi]; if(!g) return; g.itens.forEach(i=>{ if(on) limpSel.add(i.id); else limpSel.delete(i.id); }); render(); }
+function limpMarcarTodos(on){ limpSel = on ? new Set(limpItens().map(i=>i.id)) : new Set(); render(); }
+function limpConfirmar(formatar){
+  if(!isAdmMaster()){ showToast('Só o Administrador Master pode limpar ou formatar o aplicativo.','warning'); return; }
+  if(temAlteracaoPendente() || salvando){ showToast('Aguarde terminar de salvar e tente de novo.','warning'); return; }
+  const itens = formatar ? limpItens() : limpItens().filter(i=>limpSel.has(i.id));
+  if(!itens.length){ showToast('Marque o que deseja apagar.','warning'); return; }
+  const palavra = formatar ? FORMAT_PALAVRA : LIMP_PALAVRA;
+  const pedeSenha = !(currentUser && currentUser.pis);
+  const av = formatar ? [] : limpAvisos(new Set(itens.map(i=>i.id)));
+  abrirModal(`<h2>${formatar?'💣 Formatar todo o aplicativo':'🗑️ Apagar os dados marcados'}</h2>
+    <div class="alerta-erro">Serão apagados <b>definitivamente</b>:<br>${itens.map(i=>'• '+esc(i.nome)+' — '+i.n()+' registro(s)').join('<br>')}</div>
+    ${av.length?`<div class="alerta-aviso">• ${av.map(esc).join('<br>• ')}</div>`:''}
+    <div class="helpbox">Antes de apagar, o sistema baixa o arquivo <b>backup_ordenamento_${hojeISO()}_antes_da_${formatar?'formatacao':'limpeza'}.json</b> com tudo o que existe hoje. Guarde-o.</div>
+    <div class="formgrid">
+      <div class="field"><label>Digite <b>${palavra}</b> para confirmar</label><input id="limp_palavra" autocomplete="off"></div>
+      ${pedeSenha?`<div class="field"><label>Sua senha (Administrador Master)</label><input id="limp_senha" type="password" autocomplete="current-password"></div>`:''}
+    </div>
+    <div class="actions"><button class="btn" style="background:var(--red);border-color:var(--red);color:#fff;" onclick="limpExecutar(${formatar?'true':'false'})">${formatar?'💣 Formatar agora':'🗑️ Apagar agora'}</button><button class="btn secondary" onclick="fecharModal()">Cancelar</button></div>`);
+  setTimeout(()=>{ const el = document.getElementById('limp_palavra'); if(el) el.focus(); }, 50);
+}
+function limpBaixarBackup(formatar){
+  const mov = {}; Object.keys(MOV).forEach(k=>{ mov[k] = MOV[k].itens; });
+  const dados = { sistema:'ordenamento-despesas', versao: appVersao(), exportadoEm: new Date().toISOString(), motivo: formatar ? 'antes da formatação' : 'antes da limpeza', state: STATE, mov };
+  if(!limpNoPIS()) dados.usuarios = { usuarios: USERS_STATE.usuarios.map(u=>({ id:u.id, usuario:u.usuario, nome:u.nome, perfil:u.perfil, email:u.email, ativo:u.ativo })), solicitacoesSenha: USERS_STATE.solicitacoesSenha||[] };
+  baixarArquivo(JSON.stringify(dados), 'backup_ordenamento_'+hojeISO()+'_antes_da_'+(formatar?'formatacao':'limpeza')+'.json', 'application/json');
+}
+async function limpEsperarGravacao(ms){
+  const t0 = Date.now();
+  await new Promise(r=>setTimeout(r, 600));
+  while(temAlteracaoPendente() || salvando){ if(Date.now()-t0 > ms) return false; await new Promise(r=>setTimeout(r, 300)); }
+  return true;
+}
+async function limpApagarAnexo(a){
+  for(let i=0;i<(Number(a.partes)||0);i++){
+    try{ if(db) await db.collection(FIRESTORE_COLLECTION).doc(anexoDocId(a.id,i)).delete(); else localStorage.removeItem(LOCAL_PREFIXO+'arq_'+a.id+'_'+i); }catch(e){ console.error(e); }
+  }
+}
+async function limpExecutar(formatar){
+  if(!isAdmMaster()) return;
+  const palavra = formatar ? FORMAT_PALAVRA : LIMP_PALAVRA;
+  if(valCampo('limp_palavra').toUpperCase()!==palavra){ showToast('Digite '+palavra+' para confirmar.','warning'); return; }
+  if(!(currentUser && currentUser.pis)){
+    const s = (document.getElementById('limp_senha')||{}).value || '';
+    const u = USERS_STATE.usuarios.find(x=>x.usuario===currentUser.usuario);
+    if(!s || !u || (await hashSenha(s))!==u.senhaHash){ showToast('Senha incorreta.','error'); return; }
+  }
+  const itens = formatar ? limpItens() : limpItens().filter(i=>limpSel.has(i.id));
+  if(!itens.length) return;
+  fecharModal();
+  limpBaixarBackup(formatar);
+  const anexos = []; itens.forEach(i=>{ if(i.anexos) i.anexos().forEach(a=>anexos.push(a)); });
+  const resumo = itens.map(i=>i.nome+' ('+i.n()+')');
+  itens.forEach(i=>{ try{ i.limpar(); }catch(e){ console.error(e); } });
+  if(formatar){ STATE.seedImportado = ''; STATE.formatadoEm = new Date().toISOString(); STATE.formatadoPor = currentUser ? (currentUser.nome||currentUser.usuario) : ''; }
+  MOV_CACHE = null;
+  showToast('Apagando… não feche o aplicativo.','warning');
+  saveState(true); saveMov(true);
+  if(itens.some(i=>i.usuarios)) saveUsersState(true);
+  const ok = await limpEsperarGravacao(60000);
+  for(const a of anexos) await limpApagarAnexo(a);
+  /* meses que ficaram vazios saem do banco */
+  if(ok){
+    const vazios = Object.keys(MOV).filter(k=>!Object.keys(MOV[k].itens).length);
+    for(const k of vazios){
+      try{ if(firebaseOk) await db.collection(FIRESTORE_COLLECTION).doc(getAccessCode()+'__mov__'+k).delete(); else localStorage.removeItem(LOCAL_PREFIXO+'mov_'+k); delete MOV[k]; }catch(e){ console.error(e); }
+    }
+    STATE.shards = STATE.shards.filter(k=>MOV[k]);
+    MOV_CACHE = null; saveState(true);
+  }
+  registrarAcao((formatar?'FORMATOU o aplicativo: ':'Limpeza de dados: ')+resumo.join(', '));
+  limpSel = new Set();
+  render();
+  showToast(ok ? (formatar ? 'Aplicativo formatado. O backup do que existia foi baixado.' : 'Dados apagados. O backup do que existia foi baixado.') : 'Os dados foram apagados aqui, mas a gravação na nuvem ainda não terminou — confira a conexão e não feche o aplicativo.', ok?'success':'error');
+}
+
+/* ============================================================
    NAVEGAÇÃO E RENDERIZAÇÃO
    ============================================================ */
 const VIEWS = {
@@ -4317,11 +4517,13 @@ const VIEWS = {
   listas:   { grupo:'Cadastros', ic:'📚', nome:'Listas de opções', desc:'Modalidades, unidades, fontes, níveis e demais opções dos campos', fn:()=>viewListas() },
   entidade: { grupo:'Administração', ic:'🏛️', nome:'Entidade e carimbo', desc:'Título, textos padrão, brasão, logo e prazos de alerta', fn:()=>viewEntidade(), master:true },
   usuarios: { grupo:'Administração', ic:'👥', nome:'Usuários', desc:'Usuários, perfis e registro de acessos', fn:()=>viewUsuarios(), master:true },
-  backup:   { grupo:'Administração', ic:'💾', nome:'Backup e dados iniciais', desc:'Cópia de segurança e carga dos dados das planilhas', fn:()=>viewBackup(), master:true }
+  backup:   { grupo:'Administração', ic:'💾', nome:'Backup e dados iniciais', desc:'Cópia de segurança e carga dos dados das planilhas', fn:()=>viewBackup(), master:true },
+  limpeza:  { grupo:'Administração', ic:'🧹', nome:'Limpeza e formatação', desc:'Só o Administrador Master: apagar os dados de um módulo ou formatar o aplicativo inteiro', fn:()=>viewLimpeza(), master:true, admmaster:true }
 };
+function viewPermitida(k){ const v = VIEWS[k]; return !!v && !(v.master && !isMaster()) && !(v.admmaster && !isAdmMaster()); }
 function renderNav(){
   const grupos = {};
-  Object.keys(VIEWS).forEach(k=>{ const v = VIEWS[k]; if(v.master && !isMaster()) return; (grupos[v.grupo] = grupos[v.grupo] || []).push(k); });
+  Object.keys(VIEWS).forEach(k=>{ const v = VIEWS[k]; if(!viewPermitida(k)) return; (grupos[v.grupo] = grupos[v.grupo] || []).push(k); });
   const hoje = hojeISO();
   const aVencer = movPorTipo('nota').filter(n=>!n.historico && n.situacao!=='paga' && n.situacao!=='cancelada' && n.vencimento && diasEntreISO(hoje, n.vencimento)<=Number(STATE.entidade.alertaVencDias||7)).length;
   document.getElementById('navlist').innerHTML = Object.keys(grupos).map(g=>`<div class="navgroup-label">${esc(g)}</div>`+grupos[g].map(k=>`<div class="navitem ${currentView===k?'active':''}" onclick="go('${k}')"><span class="ic">${VIEWS[k].ic}</span>${esc(VIEWS[k].nome)}${k==='notas'&&aVencer?`<span class="navbadge" title="Notas a vencer/vencidas não pagas">${aVencer}</span>`:''}</div>`).join('')).join('');
@@ -4335,7 +4537,7 @@ function go(v){
 }
 function toggleSidebar(abrir){ document.getElementById('sidebar').classList.toggle('open', !!abrir); document.getElementById('sidebarBackdrop').classList.toggle('open', !!abrir); }
 function render(){
-  if(!VIEWS[currentView] || (VIEWS[currentView].master && !isMaster())) currentView = 'painel';
+  if(!viewPermitida(currentView)) currentView = 'painel';
   const v = VIEWS[currentView];
   document.getElementById('pageTitle').textContent = v.nome;
   document.getElementById('pageDesc').textContent = v.desc;

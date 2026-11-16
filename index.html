@@ -568,8 +568,8 @@ function mostrarTelaRegras(){
    Criação: novembro/2026 (mês 1).
    ============================================================ */
 const APP_CRIACAO = { mes: 11, ano: 2026 };
-const APP_ALTERACAO = 16;
-const APP_DATA = '2026-11-11';
+const APP_ALTERACAO = 17;
+const APP_DATA = '2026-11-16';
 function appVersao(){
   const p = APP_DATA.split('-').map(Number);
   const seqMes = (p[0] - APP_CRIACAO.ano)*12 + (p[1] - APP_CRIACAO.mes) + 1;
@@ -1150,6 +1150,16 @@ function numeroOrdenamento(n){ return n && n.numero ? String(n.numero).padStart(
 /* ============================================================
    CARIMBO ORDENADOR — mesmo desenho da planilha (A4 em pé)
    ============================================================ */
+/* 1.17: o Responsável do carimbo é quem ordena. Em branco no modelo/nota → responsável padrão da Entidade →
+   o usuário que ordenou a nota (ou o usuário logado, na prévia de uma nota nova ou de um modelo). */
+function nomeUsuarioAtual(){ return currentUser ? (currentUser.nome || currentUser.usuario || '') : ''; }
+function nomeDoUsuario(login){ const u = (USERS_STATE.usuarios||[]).find(x=>x.usuario===login); return u ? (u.nome||u.usuario) : ''; }
+function responsavelDo(c){
+  if(c && String(c.responsavel||'').trim()) return c.responsavel;
+  if(String((STATE.entidade||{}).responsavelPadrao||'').trim()) return STATE.entidade.responsavelPadrao;
+  if(c && c.criadoPor) return nomeDoUsuario(c.criadoPor) || (currentUser && c.criadoPor===currentUser.usuario ? nomeUsuarioAtual() : c.criadoPor);
+  return nomeUsuarioAtual();
+}
 const CAMPOS_CARIMBO = ['modalidades','nivel','unidade','natureza','fonte','transferencia','bloco','componente','convenio','programa','observacoes','responsavel','banco','agencia','conta','pix','item1','item2'];
 function carimboHTML(c){
   const e = STATE.entidade;
@@ -1184,7 +1194,7 @@ function carimboHTML(c){
       <tr><td class="k">Convênio:</td><td class="vv vermelho">${esc(c.convenio||'')}</td></tr>
       <tr><td class="k">Programa:</td><td class="vv vermelho">${esc(c.programa||'')}</td></tr>
       <tr><td class="k" style="height:70px;">Observações:</td><td class="vv" style="line-height:1.4;">${esc(c.observacoes||'')}</td></tr>
-      <tr><td class="k" style="height:38px;">Responsável:</td><td class="vv">${esc(c.responsavel||'')}</td></tr>
+      <tr><td class="k" style="height:38px;">Responsável:</td><td class="vv">${esc(responsavelDo(c))}</td></tr>
     </table>
     <div class="cb-obs">OBSERVAÇÕES</div>
     <div style="padding:0 0 0 0;">
@@ -1570,6 +1580,7 @@ function viewOrdenar(){
             <button class="btn verde" onclick="salvarNota(true)" ${pode?'':'disabled'}>💾🖨️ Salvar e imprimir carimbo</button>
             <button class="btn" onclick="salvarNota(false)" ${pode?'':'disabled'}>💾 Salvar</button>
             <button class="btn secondary" onclick="lerFormNota();imprimirCarimbos([Object.assign({},notaDraft)])">🖨️ Só imprimir (sem salvar)</button>
+            ${notaDraft && notaDraft.id && movGet(notaDraft.id) ? `<button class="btn secondary edit-only" style="color:var(--red);" title="Exclui esta ordenação (ex.: foi salva duas vezes)" onclick="excluirNota('${notaDraft.id}')">🗑️ Excluir esta ordenação</button>` : ''}
             <button class="btn secondary" onclick="salvarNotaComoModelo()" ${pode?'':'disabled'}>🏷️ Guardar como modelo</button>
             <button class="btn ghost" onclick="if(confirm('Limpar o formulário?')){notaDraft=notaVazia();render();}">Limpar</button>
           </div>
@@ -1597,7 +1608,7 @@ function ordenadosBuscaHTML(){
   const pode = podeEditar('ordenar');
   return `<div class="table-wrap" style="max-height:320px;margin-top:8px;"><table><thead><tr><th>Ordenamento</th><th>Data</th><th>NF</th><th>Credor / modelo</th><th class="num">Valor</th><th>Situação</th><th></th></tr></thead><tbody>
     ${notas.slice(0,50).map(n=>`<tr ${notaDraft&&notaDraft.id===n.id?'style="background:#FFF7E0;"':''}><td class="nowrap"><b>${numeroOrdenamento(n)}</b></td><td class="nowrap">${n.data?fmtDateBR(n.data):'—'}</td><td>${esc(n.nf||'')}</td><td class="trunc">${esc(n.credor||n.modeloRotulo||'')}${n.credor&&n.modeloRotulo&&normTxt(n.credor)!==normTxt(n.modeloRotulo)?' <span class="small-txt">· '+esc(n.modeloRotulo)+'</span>':''}</td><td class="num nowrap">${fmtMoney(n.valor)}</td><td>${badgeSituacao(n.situacao)}</td>
-      <td class="nowrap"><button class="btn small" onclick="abrirOrdenadoBusca('${n.id}')">${pode?'✏️ Editar':'👁️ Abrir'}</button>${pode?`<button class="btn ghost small" title="Nova ordenação a partir desta (datas das observações +1 mês)" onclick="duplicarNota('${n.id}')">📄 Duplicar</button>`:''}</td></tr>`).join('')}
+      <td class="nowrap"><button class="btn small" onclick="abrirOrdenadoBusca('${n.id}')">${pode?'✏️ Editar':'👁️ Abrir'}</button>${pode?`<button class="btn ghost small" title="Nova ordenação a partir desta (datas das observações +1 mês)" onclick="duplicarNota('${n.id}')">📄 Duplicar</button><button class="btn ghost small" title="Excluir esta ordenação (ex.: salva duas vezes)" onclick="excluirNota('${n.id}')">🗑️</button>`:''}</td></tr>`).join('')}
     </tbody></table></div>${notas.length>50?`<div class="small-txt" style="margin-top:4px;">Mostrando 50 de ${notas.length}. Refine a busca.</div>`:`<div class="small-txt" style="margin-top:4px;">${notas.length} carimbo(s).</div>`}`;
 }
 function filtrarOrdenadosBusca(){ const d = document.getElementById('resBuscaOrd'); if(d) d.innerHTML = ordenadosBuscaHTML(); }
@@ -1635,10 +1646,18 @@ function salvarNota(imprimir){
   if(!n.data) n.data = hojeISO();
   // mesma NF do mesmo credor já ordenada?
   const dup = movPorTipo('nota').find(x=>x.id!==n.id && !x.historico && x.situacao!=='cancelada' && normTxt(x.nf)===normTxt(n.nf) && normTxt(x.credor||x.modeloRotulo)===normTxt(n.credor||n.modeloRotulo));
-  if(dup && !confirm(`Atenção: a NF ${n.nf} de ${n.credor||n.modeloRotulo} já foi ordenada em ${fmtDateBR(dup.data)} (nº ${numeroOrdenamento(dup)}). Salvar de novo?`)) return;
+  if(dup){
+    /* 1.17: se a primeira ainda está esperando a internet para subir, avisa que ela NÃO se perdeu */
+    const pendente = Object.values(MOV).some(s=>s.sujos.has(dup.id));
+    const msg = pendente
+      ? `Atenção: a NF ${n.nf} de ${n.credor||n.modeloRotulo} JÁ ESTÁ SALVA neste computador (nº ${numeroOrdenamento(dup)}) e só está esperando a internet para ir para a nuvem — ela é enviada sozinha na próxima gravação. NÃO é preciso salvar de novo.\n\nSalvar OUTRA ordenação com a mesma NF mesmo assim?`
+      : `Atenção: a NF ${n.nf} de ${n.credor||n.modeloRotulo} já foi ordenada em ${fmtDateBR(dup.data)} (nº ${numeroOrdenamento(dup)}).\n\nSalvar OUTRA ordenação com a mesma NF mesmo assim? (Se for repetição, clique em Cancelar.)`;
+    if(!confirm(msg)) return;
+  }
   const ano = Number(n.data.slice(0,4));
   if(!n.numero || n.ano!==ano){ n.ano = ano; n.numero = proximoNumero(ano); STATE.seq[ano] = Math.max(Number(STATE.seq[ano]||0), n.numero); saveState(); }
   if(!n.criadoEm){ n.criadoEm = new Date().toISOString(); n.criadoPor = currentUser ? currentUser.usuario : ''; }
+  if(!String(n.responsavel||'').trim()) n.responsavel = responsavelDo(n);   /* 1.17: fica gravado quem ordenou */
   if(n.situacao==='paga' && !n.dataPagamento) n.dataPagamento = hojeISO();
   if(n.empenhoId && n.situacao==='ordenada') n.situacao = 'empenhada';
   delete n._obsSugerida;
@@ -1725,12 +1744,29 @@ function notasFiltradas(){
   }).sort((a,b)=>(b.data||'').localeCompare(a.data||'') || (Number(b.numero)||0)-(Number(a.numero)||0));
 }
 function setFiltroNotas(k, v){ filtroNotas[k] = v; notasSelecionadas.clear(); render(); }
+/* 1.17: ordenações repetidas — mesma NF do mesmo credor ordenada mais de uma vez (ex.: a internet caiu ao
+   salvar e o usuário salvou de novo). Mostra os grupos no alto de Notas ordenadas com 🗑️ em cada uma. */
+function chaveRepeticao(n){ return normTxt(n.nf)+'|'+normTxt(n.credor||n.modeloRotulo); }
+function notasRepetidas(){
+  const g = {};
+  movPorTipo('nota').filter(n=>!n.historico && n.situacao!=='cancelada' && normTxt(n.nf)).forEach(n=>{ (g[chaveRepeticao(n)] = g[chaveRepeticao(n)] || []).push(n); });
+  return Object.values(g).filter(l=>l.length>1).map(l=>l.sort((a,b)=>String(a.criadoEm||a.data||'').localeCompare(String(b.criadoEm||b.data||''))));
+}
+function repetidasHTML(){
+  const grupos = notasRepetidas(); if(!grupos.length) return '';
+  const quando = n=>n.criadoEm ? new Date(n.criadoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : fmtDateBR(n.data);
+  return `<div class="alerta-aviso"><b>⚠️ ${grupos.length} nota(s) fiscal(is) ordenada(s) mais de uma vez</b> — mesma NF do mesmo credor. Se for repetição (por exemplo, a internet caiu ao salvar e a nota foi salva de novo), exclua a cópia com 🗑️ e fique só com uma.
+    ${grupos.map(l=>`<div style="margin-top:8px;"><b>NF ${esc(l[0].nf)} — ${esc(l[0].credor||l[0].modeloRotulo||'')}</b>
+      <table style="margin-top:4px;background:#fff;"><tbody>${l.map((n,i)=>`<tr><td class="nowrap">${numeroOrdenamento(n)}</td><td class="nowrap">salva em ${esc(quando(n))}</td><td>${esc(nomeDoUsuario(n.criadoPor)||n.criadoPor||'')}</td><td class="num">${fmtMoney(n.valor)}</td><td>${badgeSituacao(n.situacao)}</td><td class="small-txt">${i===0?'1ª (original)':'repetida'}</td>
+        <td class="nowrap"><button class="btn ghost small" title="Imprimir carimbo" onclick="imprimirCarimbos([movGet('${n.id}')])">🖨️</button><button class="btn ghost small edit-only" title="Excluir esta ordenação" onclick="excluirNota('${n.id}')">🗑️ Excluir</button></td></tr>`).join('')}</tbody></table></div>`).join('')}</div>`;
+}
 function viewNotas(){
   const lst = notasFiltradas();
   const f = filtroNotas;
   const total = lst.filter(n=>n.situacao!=='cancelada').reduce((s,n)=>s+(Number(n.valor)||0),0);
   const mostrar = lst.slice(0, 600);
-  return `
+  const repetidas = new Set(notasRepetidas().flat().map(n=>n.id));
+  return `${repetidasHTML()}
     <div class="card">
       <div class="filtros">
         <div class="field busca"><label>Buscar</label><input value="${esc(f.busca)}" placeholder="NF, credor, convênio, observação, nº do empenho…" onchange="setFiltroNotas('busca',this.value)"></div>
@@ -1758,7 +1794,7 @@ function viewNotas(){
         <tbody>${mostrar.map(n=>{ const r = getRecurso(n.recursoId), e = movGet(n.empenhoId); const venc = n.vencimento && n.situacao!=='paga' && n.situacao!=='cancelada' ? diasEntreISO(hojeISO(), n.vencimento) : null;
           return `<tr>
           <td><input type="checkbox" ${notasSelecionadas.has(n.id)?'checked':''} onchange="if(this.checked) notasSelecionadas.add('${n.id}'); else notasSelecionadas.delete('${n.id}');"></td>
-          <td class="nowrap">${n.historico?'<span class="badge neutro">planilha</span>':numeroOrdenamento(n)}</td>
+          <td class="nowrap">${n.historico?'<span class="badge neutro">planilha</span>':numeroOrdenamento(n)}${repetidas.has(n.id)?'<div><span class="badge inativo" title="Esta NF deste credor foi ordenada mais de uma vez">repetida</span></div>':''}</td>
           <td class="nowrap">${fmtDateBR(n.data)}</td>
           <td class="nowrap"><b>${esc(n.nf||'—')}</b>${n.emissao?`<div class="small-txt">emissão ${fmtDateBR(n.emissao)}</div>`:''}</td>
           <td class="trunc">${esc(n.credor||'')}${n.modeloRotulo && normTxt(n.modeloRotulo)!==normTxt(n.credor)?`<div class="small-txt">${esc(n.modeloRotulo)}</div>`:''}${n.historico&&n.observacoes?`<div class="small-txt">${esc(n.observacoes)}</div>`:''}</td>
@@ -1809,8 +1845,10 @@ function salvarSituacaoNota(id){
 function excluirNota(id){
   if(semPermissao('notas')) return;
   const n = movGet(id); if(!n) return;
-  if(!confirm(`Excluir a nota ${n.nf||''} (${fmtMoney(n.valor)})? Ela sai dos saldos. Se só não vale mais, prefira mudar a situação para "Cancelada".`)) return;
-  movExcluir(id); registrarAcao('Excluiu NF '+(n.nf||'')+' '+fmtMoney(n.valor)); render(); showToast('Nota excluída.');
+  if(!confirm(`Excluir a ordenação ${n.historico?'':numeroOrdenamento(n)+' — '}NF ${n.nf||''} de ${n.credor||n.modeloRotulo||''} (${fmtMoney(n.valor)})?\n\nEla sai dos saldos e da lista. Se só não vale mais, prefira mudar a situação para "Cancelada".`)) return;
+  movExcluir(id); registrarAcao('Excluiu a ordenação '+(n.historico?'':numeroOrdenamento(n)+' ')+'NF '+(n.nf||'')+' '+fmtMoney(n.valor));
+  if(notaDraft && notaDraft.id===id){ notaDraft = null; currentView = 'notas'; }
+  render(); showToast('Ordenação excluída.','success');
 }
 function exportarNotasExcel(){
   if(!window.XLSX){ showToast('A biblioteca do Excel não carregou. Verifique a internet.','error'); return; }

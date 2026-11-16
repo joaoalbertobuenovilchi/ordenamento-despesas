@@ -568,7 +568,7 @@ function mostrarTelaRegras(){
    Criação: novembro/2026 (mês 1).
    ============================================================ */
 const APP_CRIACAO = { mes: 11, ano: 2026 };
-const APP_ALTERACAO = 17;
+const APP_ALTERACAO = 19;
 const APP_DATA = '2026-11-16';
 function appVersao(){
   const p = APP_DATA.split('-').map(Number);
@@ -1608,7 +1608,7 @@ function ordenadosBuscaHTML(){
   const pode = podeEditar('ordenar');
   return `<div class="table-wrap" style="max-height:320px;margin-top:8px;"><table><thead><tr><th>Ordenamento</th><th>Data</th><th>NF</th><th>Credor / modelo</th><th class="num">Valor</th><th>Situação</th><th></th></tr></thead><tbody>
     ${notas.slice(0,50).map(n=>`<tr ${notaDraft&&notaDraft.id===n.id?'style="background:#FFF7E0;"':''}><td class="nowrap"><b>${numeroOrdenamento(n)}</b></td><td class="nowrap">${n.data?fmtDateBR(n.data):'—'}</td><td>${esc(n.nf||'')}</td><td class="trunc">${esc(n.credor||n.modeloRotulo||'')}${n.credor&&n.modeloRotulo&&normTxt(n.credor)!==normTxt(n.modeloRotulo)?' <span class="small-txt">· '+esc(n.modeloRotulo)+'</span>':''}</td><td class="num nowrap">${fmtMoney(n.valor)}</td><td>${badgeSituacao(n.situacao)}</td>
-      <td class="nowrap"><button class="btn small" onclick="abrirOrdenadoBusca('${n.id}')">${pode?'✏️ Editar':'👁️ Abrir'}</button>${pode?`<button class="btn ghost small" title="Nova ordenação a partir desta (datas das observações +1 mês)" onclick="duplicarNota('${n.id}')">📄 Duplicar</button><button class="btn ghost small" title="Excluir esta ordenação (ex.: salva duas vezes)" onclick="excluirNota('${n.id}')">🗑️</button>`:''}</td></tr>`).join('')}
+      <td class="nowrap"><button class="btn small" onclick="abrirOrdenadoBusca('${n.id}')">${pode?'✏️ Editar':'👁️ Abrir'}</button>${pode?`<button class="btn ghost small" title="Nova ordenação a partir desta (datas das observações +1 mês)" onclick="duplicarNota('${n.id}')">📄 Duplicar</button>`:''}<button class="btn ghost small" title="Imprimir o carimbo desta ordenação" onclick="imprimirCarimbos([movGet('${n.id}')])">🖨️ Imprimir</button>${pode?`<button class="btn ghost small" title="Excluir esta ordenação (ex.: salva duas vezes)" onclick="excluirNota('${n.id}')">🗑️</button>`:''}</td></tr>`).join('')}
     </tbody></table></div>${notas.length>50?`<div class="small-txt" style="margin-top:4px;">Mostrando 50 de ${notas.length}. Refine a busca.</div>`:`<div class="small-txt" style="margin-top:4px;">${notas.length} carimbo(s).</div>`}`;
 }
 function filtrarOrdenadosBusca(){ const d = document.getElementById('resBuscaOrd'); if(d) d.innerHTML = ordenadosBuscaHTML(); }
@@ -1631,7 +1631,9 @@ function escolherModeloOrdenar(id){
 }
 function credorEscolhido(){
   lerFormNota();
-  const c = getCredor(notaDraft.credorId);
+  /* 1.18: acha o credor pelo nome digitado (antes só pelo credor do modelo) */
+  const c = credorPorNome(notaDraft.credor) || getCredor(notaDraft.credorId);
+  if(c) notaDraft.credorId = c.id;
   if(c && !notaDraft.banco && !notaDraft.conta){ notaDraft.banco = c.banco||''; notaDraft.agencia = c.agencia||''; notaDraft.conta = c.conta||''; notaDraft.pix = c.pix||''; render(); showToast('Dados bancários do credor preenchidos.'); }
 }
 function atualizarEmpenhosNota(){ lerFormNota(); const s = document.getElementById('selEmpNota'); if(s) s.innerHTML = opcoesEmpenhos(notaDraft.empenhoId, notaDraft.recursoId); }
@@ -3853,7 +3855,7 @@ function formModeloHTML(){
   <div class="card"><h2>${m.id?'✏️ Editar modelo de carimbo':'＋ Novo modelo de carimbo'}</h2>
     <div class="subtitle">Um modelo guarda tudo o que se repete a cada mês para o mesmo credor/convênio. Na hora de ordenar, só falta o nº da NF, a emissão, o valor e o vencimento.</div>
     <div class="formgrid">
-      ${f('rotulo','Nome do modelo','','half')}${f('credor','Credor','credores','half')}
+      ${f('rotulo','Nome do modelo','','half')}<div class="field half"><label>Credor <span class="small-txt" style="text-transform:none;font-weight:400;">— ao escolher, banco, agência, conta e PIX vêm do cadastro do credor</span></label><input id="md_credor" value="${esc(m.credor||'')}" list="dl_credores" oninput="if(credorPorNome(this.value)) modeloCredorEscolhido()" onchange="modeloCredorEscolhido()"></div>
       <div class="field half"><label>Recurso / ficha (saldo que esta despesa consome)</label><select id="md_recursoId">${opcoesRecursos(m.recursoId)}</select></div>
       <div class="field half"><label>Contrato / ata</label><select id="md_contratoId">${opcoesContratos(m.contratoId)}</select></div>
       <div class="field"><label>Vencimento (dias após o ordenamento)</label><input id="md_vencDias" type="number" value="${esc(m.vencDias||'')}" placeholder="${STATE.entidade.vencDiasPadrao}"></div>
@@ -3878,6 +3880,22 @@ function formModeloHTML(){
       ${m.id?`<button class="btn secondary" onclick="duplicarModelo('${m.id}')">⧉ Duplicar</button><button class="btn danger" onclick="excluirModelo('${m.id}')">🗑️ Excluir</button>`:''}</div>
   </div>`;
 }
+/* 1.18: escolheu o credor no modelo → os dados bancários vêm do cadastro do credor.
+   Campos vazios são preenchidos direto; se já houver dados diferentes, pergunta antes de trocar. */
+const CAMPOS_BANCO = ['banco','agencia','conta','pix'];
+function credorPorNome(nome){ const t = normTxt(nome); return t ? STATE.credores.find(c=>normTxt(c.nome)===t) || null : null; }
+function modeloCredorEscolhido(){
+  const c = credorPorNome(valCampo('md_credor')); if(!c) return;
+  const el = k=>document.getElementById('md_'+k);
+  if(el('rotulo') && !valCampo('md_rotulo')) el('rotulo').value = c.nome;
+  const novos = CAMPOS_BANCO.filter(k=>String(c[k]||'').trim());
+  if(!novos.length){ showToast('O credor '+c.nome+' não tem dados bancários cadastrados (Cadastros → Credores).','warning'); return; }
+  const diferentes = novos.filter(k=>valCampo('md_'+k) && normTxt(valCampo('md_'+k))!==normTxt(c[k]));
+  if(diferentes.length && !confirm('Trocar os dados bancários do modelo pelos do credor '+c.nome+'?\n\n'+novos.map(k=>k.toUpperCase()+': '+(valCampo('md_'+k)||'(vazio)')+'  →  '+c[k]).join('\n'))){
+    novos.forEach(k=>{ if(!valCampo('md_'+k)) el(k).value = c[k]; });   /* só completa os vazios */
+  } else novos.forEach(k=>{ el(k).value = c[k]; });
+  showToast('Dados bancários de '+c.nome+' trazidos do cadastro do credor.','success');
+}
 function salvarModelo(){
   if(semPermissao('modelos')) return;
   let m = modeloEditId==='novo' ? null : getModelo(modeloEditId);
@@ -3888,6 +3906,7 @@ function salvarModelo(){
   const n = Number(valCampo('md_nmods')); m.modalidades = [];
   for(let i=0;i<n;i++){ const r = valCampo('md_mr_'+i), v = valCampo('md_mv_'+i); if(r||v) m.modalidades.push({rotulo:r, valor:v}); }
   const c = STATE.credores.find(x=>normTxt(x.nome)===normTxt(m.credor)); m.credorId = c ? c.id : '';
+  if(c) CAMPOS_BANCO.forEach(k=>{ if(!String(m[k]||'').trim() && c[k]) m[k] = c[k]; });   /* 1.18: banco em branco → o do credor */
   saveState(); registrarAcao('Modelo salvo: '+m.rotulo); modeloEditId = null; render(); showToast('Modelo salvo.','success');
 }
 function duplicarModelo(id){

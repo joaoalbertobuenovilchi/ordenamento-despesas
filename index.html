@@ -568,8 +568,8 @@ function mostrarTelaRegras(){
    Criação: novembro/2026 (mês 1).
    ============================================================ */
 const APP_CRIACAO = { mes: 11, ano: 2026 };
-const APP_ALTERACAO = 19;
-const APP_DATA = '2026-11-16';
+const APP_ALTERACAO = 20;
+const APP_DATA = '2026-11-17';
 function appVersao(){
   const p = APP_DATA.split('-').map(Number);
   const seqMes = (p[0] - APP_CRIACAO.ano)*12 + (p[1] - APP_CRIACAO.mes) + 1;
@@ -1160,7 +1160,7 @@ function responsavelDo(c){
   if(c && c.criadoPor) return nomeDoUsuario(c.criadoPor) || (currentUser && c.criadoPor===currentUser.usuario ? nomeUsuarioAtual() : c.criadoPor);
   return nomeUsuarioAtual();
 }
-const CAMPOS_CARIMBO = ['modalidades','nivel','unidade','natureza','fonte','transferencia','bloco','componente','convenio','programa','observacoes','responsavel','banco','agencia','conta','pix','item1','item2'];
+const CAMPOS_CARIMBO = ['modalidades','nivel','unidade','natureza','fonte','transferencia','bloco','componente','convenio','programa','observacoes','responsavel','banco','agencia','conta','pix','contasExtras','item1','item2'];
 function carimboHTML(c){
   const e = STATE.entidade;
   const linha = (rot, val, cls)=>`<div class="cb-l"><span class="k" style="width:38%">${esc(rot)}:</span><span class="v ${cls||''}">${esc(val||'')}</span></div>`;
@@ -1201,7 +1201,7 @@ function carimboHTML(c){
       <table class="cb-dep">
         <tr><td colspan="6" style="font-weight:700;text-align:left;padding-left:60px;">DADOS PARA DEPÓSITO</td></tr>
         <tr><td class="k" style="width:9%">BCO:</td><td style="width:23%">${esc(c.banco||'')}</td><td class="k" style="width:10%">AG:</td><td style="width:20%">${esc(c.agencia||'')}</td><td class="k" style="width:10%">C/C:</td><td>${esc(c.conta||'')}</td></tr>
-        <tr><td class="k">PIX:</td><td colspan="5" class="vermelho" style="text-align:left;color:#E00000;">${esc(c.pix||'')}</td></tr>
+        <tr><td class="k">PIX:</td><td colspan="5" class="vermelho" style="text-align:left;color:#E00000;">${esc(c.pix||'')}</td></tr>${carimboContasExtrasHTML(c)}
       </table>
     </div>
     <div class="cb-item" style="margin-top:8px;"><b>ITEM 1:</b> ${esc(c.item1!==undefined && c.item1!=='' ? c.item1 : e.item1)}</div>
@@ -1316,7 +1316,7 @@ function notaVazia(){
   return { id:'', tipo:'nota', numero:null, ano:Number(hoje.slice(0,4)), data:hoje, nf:'', emissao:'', valor:0, vencimento:somarDiasISO(hoje, e.vencDiasPadrao||10),
     referencia:'', credor:'', credorId:'', modeloId:'', modeloRotulo:'', recursoId:'', contratoId:'', empenhoId:'', situacao:'ordenada',
     modalidades:[{rotulo:'Modalidade', valor:''}], nivel:'', unidade:'', natureza:'', fonte:'', transferencia:'', bloco:'', componente:'', convenio:'',
-    programa:'', observacoes:'', responsavel:e.responsavelPadrao||'', banco:'', agencia:'', conta:'', pix:'', item1:'', item2:'', obsInterna:'' };
+    programa:'', observacoes:'', responsavel:e.responsavelPadrao||'', banco:'', agencia:'', conta:'', pix:'', contasExtras:[], item1:'', item2:'', obsInterna:'' };
 }
 function novaOrdenacao(modeloId){
   if(semPermissao('ordenar')) return;
@@ -1342,7 +1342,7 @@ function duplicarNota(id){
 function aplicarModeloNaNota(modeloId, silencioso){
   const m = getModelo(modeloId); if(!m || !notaDraft) return;
   lerFormNota();
-  CAMPOS_CARIMBO.forEach(k=>{ notaDraft[k] = k==='modalidades' ? JSON.parse(JSON.stringify(m.modalidades||[])) : (m[k]||''); });
+  CAMPOS_CARIMBO.forEach(k=>{ notaDraft[k] = (k==='modalidades'||k==='contasExtras') ? JSON.parse(JSON.stringify(m[k]||[])) : (m[k]||''); });
   if(!notaDraft.responsavel) notaDraft.responsavel = STATE.entidade.responsavelPadrao||'';
   notaDraft.modeloId = m.id; notaDraft.modeloRotulo = m.rotulo;
   notaDraft.credor = m.credor || ''; notaDraft.credorId = m.credorId || '';
@@ -1376,6 +1376,7 @@ function lerFormNota(){
   const mods = [];
   f.querySelectorAll('[data-ml]').forEach(el=>{ const [i, campo] = el.getAttribute('data-ml').split(':'); mods[i] = mods[i] || {rotulo:'', valor:''}; mods[i][campo] = el.value; });
   notaDraft.modalidades = mods.filter(Boolean);
+  cxLer('nt');
   if(notaDraft.credor){ const c = STATE.credores.find(x=>normTxt(x.nome)===normTxt(notaDraft.credor)); notaDraft.credorId = c ? c.id : ''; }
 }
 /* ---------------- Vencimento em feriado / fim de semana (1.15) ----------------
@@ -1571,6 +1572,7 @@ function viewOrdenar(){
               <div class="actions" style="margin-top:4px;"><button class="btn ghost small" onclick="avancarDatasObs(1)" title="Soma 1 mês em todas as datas do texto">📅 +1 mês nas datas</button><button class="btn ghost small" onclick="avancarDatasObs(-1)">📅 −1 mês</button>${n._obsSugerida?'<span class="small-txt">Texto sugerido a partir da última nota deste modelo, com as datas avançadas em 1 mês — confira.</span>':''}</div></div>
             ${campo('responsavel','Responsável','','wide')}
             ${campo('banco','Banco')}${campo('agencia','Agência')}${campo('conta','Conta corrente')}${campo('pix','PIX')}
+            ${notaContasHTML(n)}
             <div class="field wide"><label>ITEM 1 (em branco = texto padrão da Entidade)</label><textarea data-f="item1" rows="2" oninput="atualizarPreviewNota()" placeholder="${esc(STATE.entidade.item1)}">${esc(n.item1)}</textarea></div>
             <div class="field wide"><label>ITEM 2 (em branco = texto padrão)</label><input data-f="item2" list="dl_item2" value="${esc(n.item2)}" oninput="atualizarPreviewNota()" placeholder="${esc(STATE.entidade.item2)}"></div>
           </div>
@@ -1634,7 +1636,8 @@ function credorEscolhido(){
   /* 1.18: acha o credor pelo nome digitado (antes só pelo credor do modelo) */
   const c = credorPorNome(notaDraft.credor) || getCredor(notaDraft.credorId);
   if(c) notaDraft.credorId = c.id;
-  if(c && !notaDraft.banco && !notaDraft.conta){ notaDraft.banco = c.banco||''; notaDraft.agencia = c.agencia||''; notaDraft.conta = c.conta||''; notaDraft.pix = c.pix||''; render(); showToast('Dados bancários do credor preenchidos.'); }
+  if(c && !notaDraft.banco && !notaDraft.conta && contasDoCredor(c).length) escolherContaCredor(c, contas=>{ notaAplicarContas(contas); render(); showToast('Dados bancários do credor preenchidos.'); });   /* 1.20: mais de uma conta → pergunta */
+  else if(c && contasDoCredor(c).length>1) render();
 }
 function atualizarEmpenhosNota(){ lerFormNota(); const s = document.getElementById('selEmpNota'); if(s) s.innerHTML = opcoesEmpenhos(notaDraft.empenhoId, notaDraft.recursoId); }
 function adicionarLinhaMod(){ lerFormNota(); notaDraft.modalidades.push({rotulo:'', valor:''}); render(); }
@@ -1643,6 +1646,7 @@ function salvarNota(imprimir){
   if(semPermissao('ordenar')) return;
   lerFormNota();
   const n = notaDraft;
+  n.contasExtras = cxLimpa(n.contasExtras);
   if(!n.nf){ showToast('Informe o número da nota fiscal.','warning'); return; }
   if(!(Number(n.valor)>0)){ if(!confirm('A nota está sem valor. Ela não entrará nos saldos. Salvar assim mesmo?')) return; }
   if(!n.data) n.data = hojeISO();
@@ -1717,7 +1721,7 @@ function substituirModeloDaNota(id){
 function gravarModeloDaNota(m){
   lerFormNota();
   const n = notaDraft;
-  CAMPOS_CARIMBO.forEach(k=>{ m[k] = k==='modalidades' ? JSON.parse(JSON.stringify(n.modalidades||[])) : (n[k]||''); });
+  CAMPOS_CARIMBO.forEach(k=>{ m[k] = k==='modalidades' ? JSON.parse(JSON.stringify(n.modalidades||[])) : k==='contasExtras' ? cxLimpa(n.contasExtras) : (n[k]||''); });
   m.credor = n.credor; m.credorId = n.credorId; m.recursoId = n.recursoId; m.contratoId = n.contratoId;
   n.modeloId = m.id; n.modeloRotulo = m.rotulo;
   saveState(); registrarAcao('Modelo salvo: '+m.rotulo); render();
@@ -3873,6 +3877,7 @@ function formModeloHTML(){
       ${f('componente','Componente','','half')}${f('convenio','Convênio','','half')}${f('programa','Programa','','wide')}
       <div class="field wide"><label>Observações</label><textarea id="md_observacoes" rows="3">${esc(m.observacoes||'')}</textarea></div>
       ${f('responsavel','Responsável','','wide')}${f('banco','Banco')}${f('agencia','Agência')}${f('conta','Conta')}${f('pix','PIX')}
+      ${modeloContasHTML(m)}
       <div class="field wide"><label>ITEM 1 (em branco = padrão)</label><input id="md_item1" value="${esc(m.item1||'')}"></div>
       <div class="field wide"><label>ITEM 2 (em branco = padrão)</label><input id="md_item2" list="dl_item2" value="${esc(m.item2||'')}"></div>
     </div>
@@ -3880,20 +3885,122 @@ function formModeloHTML(){
       ${m.id?`<button class="btn secondary" onclick="duplicarModelo('${m.id}')">⧉ Duplicar</button><button class="btn danger" onclick="excluirModelo('${m.id}')">🗑️ Excluir</button>`:''}</div>
   </div>`;
 }
+/* 1.20: VÁRIAS CONTAS BANCÁRIAS / PIX — sem limite, no credor, no modelo de carimbo e na ordenação.
+   Os campos Banco/Agência/Conta/PIX de sempre continuam sendo a conta 1 (nada do que já está gravado muda);
+   as demais ficam em "contasExtras" (lista de {banco, agencia, conta, pix}) e saem também no carimbo.
+   Prefixos das telas: cr = credor, md = modelo de carimbo, nt = ordenar nota. */
+const CXD = {};   /* rascunho das contas extras da tela aberta (credor/modelo), por prefixo */
+function cxDraft(p, idReg, origem){
+  const chave = String(idReg||'')+'|'+JSON.stringify(origem||[]);
+  if(!CXD[p] || CXD[p].chave!==chave) CXD[p] = { chave, lista: JSON.parse(JSON.stringify(Array.isArray(origem)?origem:[])) };
+  return CXD[p].lista;
+}
+function cxLista(p){
+  if(p==='nt'){ if(!notaDraft) return []; if(!Array.isArray(notaDraft.contasExtras)) notaDraft.contasExtras = []; return notaDraft.contasExtras; }
+  return CXD[p] ? CXD[p].lista : [];
+}
+function cxTemDados(x){ return !!x && CAMPOS_BANCO.some(k=>String(x[k]||'').trim()); }
+function cxLimpa(l){ return (Array.isArray(l)?l:[]).filter(cxTemDados).map(x=>({ banco:String(x.banco||'').trim(), agencia:String(x.agencia||'').trim(), conta:String(x.conta||'').trim(), pix:String(x.pix||'').trim() })); }
+function cxLer(p){
+  const l = cxLista(p);
+  l.forEach((x,i)=>CAMPOS_BANCO.forEach(k=>{ const el = document.getElementById(p+'_cx_'+i+'_'+k); if(el) x[k] = el.value; }));
+  return l;
+}
+function cxLinhasHTML(p){
+  const l = cxLista(p), rot = {banco:'Banco', agencia:'Agência', conta:'Conta corrente', pix:'PIX'};
+  const aoDigitar = p==='nt' ? ` oninput="atualizarPreviewNota()"` : '';
+  return l.map((x,i)=>`<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) auto;gap:8px;align-items:end;margin:0 0 8px;padding:8px 10px;border:1px dashed var(--line);border-radius:8px;">
+      <div class="small-txt" style="grid-column:1/-1;font-weight:700;">🏦 Conta ${i+2}</div>
+      ${CAMPOS_BANCO.map(k=>`<div class="field" style="margin:0;"><label>${rot[k]}</label><input id="${p}_cx_${i}_${k}" value="${esc(x[k]||'')}"${aoDigitar}></div>`).join('')}
+      <button type="button" class="btn ghost small edit-only" title="Retirar esta conta" onclick="cxDel('${p}',${i})">🗑️</button>
+    </div>`).join('') +
+    `<div class="small-txt edit-only" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">${l.length?'Mais alguma?':'Deseja inserir outra conta bancária ou outro PIX?'}
+      <button type="button" class="btn ghost small" onclick="cxAdd('${p}')">＋ Inserir outra conta / PIX</button></div>`;
+}
+function cxEditorHTML(p){ return `<div class="field wide"><div id="${p}_cx">${cxLinhasHTML(p)}</div></div>`; }
+function cxRedesenhar(p){ const el = document.getElementById(p+'_cx'); if(el) el.innerHTML = cxLinhasHTML(p); if(p==='nt') atualizarPreviewNota(); }
+function cxAdd(p){
+  cxLer(p); cxLista(p).push({banco:'', agencia:'', conta:'', pix:''}); cxRedesenhar(p);
+  const el = document.getElementById(p+'_cx_'+(cxLista(p).length-1)+'_banco'); if(el) el.focus();
+}
+function cxDel(p, i){
+  cxLer(p); const l = cxLista(p), x = l[i];
+  if(cxTemDados(x) && !confirm('Retirar a conta '+(i+2)+' ('+[x.banco,x.agencia,x.conta,x.pix].filter(Boolean).join(' · ')+')?')) return;
+  l.splice(i,1); cxRedesenhar(p);
+}
+/* todas as contas de um credor (a conta 1 = campos de sempre + as extras), só as preenchidas */
+function contasDoCredor(c){
+  if(!c) return [];
+  return cxLimpa([{banco:c.banco, agencia:c.agencia, conta:c.conta, pix:c.pix}].concat(Array.isArray(c.contasExtras)?c.contasExtras:[]));
+}
+function contaTexto(x){ return [x.banco, x.agencia?'Ag. '+x.agencia:'', x.conta?'C/C '+x.conta:'', x.pix?'PIX '+x.pix:''].filter(Boolean).join(' · '); }
+/* Credor com mais de uma conta → pergunta qual usar (ou todas). cb(lista) recebe as contas escolhidas. */
+function escolherContaCredor(c, cb){
+  const contas = contasDoCredor(c);
+  if(contas.length<=1){ cb(contas); return; }
+  window._cxEscolha = i=>{ fecharModal(); cb(i<0 ? contas : [contas[i]]); };
+  abrirModal(`<h2 style="margin-top:0;">🏦 Qual conta de ${esc(c.nome)}?</h2>
+    <div class="subtitle">Este credor tem ${contas.length} contas bancárias/PIX cadastradas. Escolha a que vai no carimbo — ou todas.</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin:12px 0;">
+      ${contas.map((x,i)=>`<button class="btn secondary" style="justify-content:flex-start;text-align:left;" onclick="_cxEscolha(${i})"><b>Conta ${i+1}:</b>&nbsp;${esc(contaTexto(x))}</button>`).join('')}
+      <button class="btn" onclick="_cxEscolha(-1)">Usar todas as ${contas.length} contas</button>
+    </div>
+    <div class="actions"><button class="btn ghost" onclick="fecharModal()">Cancelar</button></div>`);
+}
+/* botão "escolher conta do credor" nas telas de modelo e de ordenação (só quando o credor tem mais de uma) */
+function cxBotaoCredor(c, onclick){
+  return c && contasDoCredor(c).length>1 ? `<div class="field wide edit-only" style="margin-top:-4px;"><button type="button" class="btn ghost small" onclick="${onclick}">🏦 Escolher outra conta de ${esc(c.nome)} (${contasDoCredor(c).length} cadastradas)</button></div>` : '';
+}
+/* ordenação */
+function notaContasHTML(n){
+  const c = credorPorNome(n.credor) || getCredor(n.credorId);
+  return cxBotaoCredor(c, 'notaEscolherConta()') + cxEditorHTML('nt');
+}
+function notaAplicarContas(contas){
+  if(!contas.length || !notaDraft) return;
+  CAMPOS_BANCO.forEach(k=>notaDraft[k] = contas[0][k]||'');
+  notaDraft.contasExtras = JSON.parse(JSON.stringify(contas.slice(1)));
+}
+function notaEscolherConta(){
+  lerFormNota();
+  const c = credorPorNome(notaDraft.credor) || getCredor(notaDraft.credorId); if(!c) return;
+  escolherContaCredor(c, contas=>{ notaAplicarContas(contas); render(); showToast('Dados bancários trocados.','success'); });
+}
+/* modelo de carimbo */
+function modeloContasHTML(m){
+  cxDraft('md', modeloEditId, m.contasExtras);
+  return cxBotaoCredor(credorPorNome(m.credor) || getCredor(m.credorId), 'modeloCredorEscolhido(true)') + cxEditorHTML('md');
+}
+/* carimbo: linhas a mais em "Dados para depósito" */
+function carimboContasExtrasHTML(c){
+  return cxLimpa(c.contasExtras).map(x=>`
+        ${x.banco||x.agencia||x.conta?`<tr><td class="k">BCO:</td><td>${esc(x.banco)}</td><td class="k">AG:</td><td>${esc(x.agencia)}</td><td class="k">C/C:</td><td>${esc(x.conta)}</td></tr>`:''}
+        ${x.pix?`<tr><td class="k">PIX:</td><td colspan="5" class="vermelho" style="text-align:left;color:#E00000;">${esc(x.pix)}</td></tr>`:''}`).join('');
+}
 /* 1.18: escolheu o credor no modelo → os dados bancários vêm do cadastro do credor.
    Campos vazios são preenchidos direto; se já houver dados diferentes, pergunta antes de trocar. */
 const CAMPOS_BANCO = ['banco','agencia','conta','pix'];
 function credorPorNome(nome){ const t = normTxt(nome); return t ? STATE.credores.find(c=>normTxt(c.nome)===t) || null : null; }
-function modeloCredorEscolhido(){
-  const c = credorPorNome(valCampo('md_credor')); if(!c) return;
+let _mdCredFeito = '';
+function modeloCredorEscolhido(forcar){
+  const c = credorPorNome(valCampo('md_credor')); if(!c){ _mdCredFeito = ''; return; }
+  const chave = modeloEditId+'|'+c.id;
+  if(!forcar && _mdCredFeito===chave) return;   /* 1.20: oninput + onchange não perguntam duas vezes */
+  _mdCredFeito = chave;
   const el = k=>document.getElementById('md_'+k);
   if(el('rotulo') && !valCampo('md_rotulo')) el('rotulo').value = c.nome;
-  const novos = CAMPOS_BANCO.filter(k=>String(c[k]||'').trim());
-  if(!novos.length){ showToast('O credor '+c.nome+' não tem dados bancários cadastrados (Cadastros → Credores).','warning'); return; }
-  const diferentes = novos.filter(k=>valCampo('md_'+k) && normTxt(valCampo('md_'+k))!==normTxt(c[k]));
-  if(diferentes.length && !confirm('Trocar os dados bancários do modelo pelos do credor '+c.nome+'?\n\n'+novos.map(k=>k.toUpperCase()+': '+(valCampo('md_'+k)||'(vazio)')+'  →  '+c[k]).join('\n'))){
-    novos.forEach(k=>{ if(!valCampo('md_'+k)) el(k).value = c[k]; });   /* só completa os vazios */
-  } else novos.forEach(k=>{ el(k).value = c[k]; });
+  if(!contasDoCredor(c).length){ showToast('O credor '+c.nome+' não tem dados bancários cadastrados (Cadastros → Credores).','warning'); return; }
+  escolherContaCredor(c, contas=>modeloAplicarContas(c, contas));
+}
+function modeloAplicarContas(c, contas){
+  if(!contas.length) return;
+  const x = contas[0], el = k=>document.getElementById('md_'+k);
+  const novos = CAMPOS_BANCO.filter(k=>String(x[k]||'').trim());
+  const diferentes = novos.filter(k=>valCampo('md_'+k) && normTxt(valCampo('md_'+k))!==normTxt(x[k]));
+  if(diferentes.length && !confirm('Trocar os dados bancários do modelo pelos do credor '+c.nome+'?\n\n'+novos.map(k=>k.toUpperCase()+': '+(valCampo('md_'+k)||'(vazio)')+'  →  '+x[k]).join('\n'))){
+    novos.forEach(k=>{ if(!valCampo('md_'+k)) el(k).value = x[k]; });   /* só completa os vazios */
+  } else CAMPOS_BANCO.forEach(k=>{ if(el(k)) el(k).value = x[k]||''; });
+  if(contas.length>1){ cxLer('md'); const l = cxLista('md'); l.splice(0, l.length, ...JSON.parse(JSON.stringify(contas.slice(1)))); cxRedesenhar('md'); }
   showToast('Dados bancários de '+c.nome+' trazidos do cadastro do credor.','success');
 }
 function salvarModelo(){
@@ -3907,6 +4014,7 @@ function salvarModelo(){
   for(let i=0;i<n;i++){ const r = valCampo('md_mr_'+i), v = valCampo('md_mv_'+i); if(r||v) m.modalidades.push({rotulo:r, valor:v}); }
   const c = STATE.credores.find(x=>normTxt(x.nome)===normTxt(m.credor)); m.credorId = c ? c.id : '';
   if(c) CAMPOS_BANCO.forEach(k=>{ if(!String(m[k]||'').trim() && c[k]) m[k] = c[k]; });   /* 1.18: banco em branco → o do credor */
+  { const ex = cxLimpa(cxLer('md')); if(ex.length || m.contasExtras) m.contasExtras = ex; }   /* 1.20: outras contas */
   saveState(); registrarAcao('Modelo salvo: '+m.rotulo); modeloEditId = null; render(); showToast('Modelo salvo.','success');
 }
 function duplicarModelo(id){
@@ -3930,7 +4038,7 @@ let credEditId = null;
 function viewCredores(){
   const termo = normTxt(filtroCred);
   const termoDig = soDigitos(filtroCred), soNumero = termoDig.length>=3 && !/[a-z]/i.test(filtroCred);
-  const lst = STATE.credores.filter(c=>!termo || normTxt([c.nome,c.documento,c.banco,c.conta,c.pix].join(' ')).includes(termo) || (soNumero && soDigitos(c.documento).includes(termoDig))).sort((a,b)=>a.nome.localeCompare(b.nome));
+  const lst = STATE.credores.filter(c=>!termo || normTxt([c.nome,c.documento,c.banco,c.conta,c.pix].concat((c.contasExtras||[]).map(contaTexto)).join(' ')).includes(termo) || (soNumero && soDigitos(c.documento).includes(termoDig))).sort((a,b)=>a.nome.localeCompare(b.nome));
   const ed = credEditId ? (credEditId==='novo' ? { id:'', nome:'', ativo:true } : getCredor(credEditId)) : null;
   return `
     ${ed?`<div class="card"><h2>${ed.id?'✏️ Editar credor':'＋ Novo credor'}</h2>
@@ -3942,6 +4050,7 @@ function viewCredores(){
         <div class="field"><label>Agência</label><input id="cr_agencia" value="${esc(ed.agencia||'')}"></div>
         <div class="field"><label>Conta corrente</label><input id="cr_conta" value="${esc(ed.conta||'')}"></div>
         <div class="field"><label>PIX</label><input id="cr_pix" value="${esc(ed.pix||'')}"></div>
+        ${(cxDraft('cr', ed.id||'novo', ed.contasExtras), cxEditorHTML('cr'))}
         <div class="field wide"><label>Observação</label><input id="cr_obs" value="${esc(ed.obs||'')}"></div>
         <div class="field half"><label>Natureza p/ retenção (IN RFB 1.234 — se não optante do Simples)</label><select id="cr_retCodigo">${retTabela().map(r=>`<option value="${r.cod}" ${(ed.retCodigo||RET_PADRAO)===r.cod?'selected':''}>${r.cod} — IR ${fmtPct(r.ir)}% — ${esc(r.rot.slice(0,70))}…</option>`).join('')}</select></div>
         <div class="field half"><label>Simples Nacional</label><div style="padding-top:6px;">${badgeSimples(soDigitos(ed.documento).length===11?'PF':simplesNaData(ed,''))} <span class="small-txt">${esc(simplesResumoCredor(ed))}</span>${ed.id&&soDigitos(ed.documento).length===14?` <button class="btn ghost small" onclick="credConsultarSimples('${ed.id}')">🔎 Consultar agora</button>`:''}</div></div>
@@ -3952,7 +4061,7 @@ function viewCredores(){
         <button class="btn edit-only" onclick="credEditId='novo';render();window.scrollTo(0,0)">＋ Novo credor</button></div>
       <div class="table-wrap"><table><thead><tr><th>Credor</th><th>CNPJ/CPF</th><th>Banco</th><th>Agência</th><th>Conta</th><th>PIX</th><th>Simples</th><th class="num">Ordenado em ${exercicioSel}</th><th></th></tr></thead>
       <tbody>${lst.map(c=>{ const tot = notasDoExercicio(false).filter(n=>n.situacao!=='cancelada' && (n.credorId===c.id || normTxt(n.credor)===normTxt(c.nome))).reduce((s,n)=>s+(Number(n.valor)||0),0);
-        return `<tr><td class="trunc"><b>${esc(c.nome)}</b>${c.ativo===false?' <span class="badge inativo">inativo</span>':''}${c.obs?`<div class="small-txt">${esc(c.obs)}</div>`:''}</td><td class="nowrap">${esc(fmtDocExib(c.documento))}</td><td>${esc(c.banco||'')}</td><td>${esc(c.agencia||'')}</td><td class="nowrap">${esc(c.conta||'')}</td><td class="small-txt">${esc(c.pix||'')}</td><td>${soDigitos(c.documento).length===11?'':badgeSimples(simplesNaData(c,''))}</td><td class="num">${tot?fmtMoney(tot):'—'}</td>
+        return `<tr><td class="trunc"><b>${esc(c.nome)}</b>${c.ativo===false?' <span class="badge inativo">inativo</span>':''}${c.obs?`<div class="small-txt">${esc(c.obs)}</div>`:''}</td><td class="nowrap">${esc(fmtDocExib(c.documento))}</td>${(()=>{ const cs = [{banco:c.banco,agencia:c.agencia,conta:c.conta,pix:c.pix}].concat(cxLimpa(c.contasExtras)); const col = k=>cs.map(x=>`<div>${esc(x[k]||'')||'&nbsp;'}</div>`).join(''); return `<td>${col('banco')}</td><td>${col('agencia')}</td><td class="nowrap">${col('conta')}</td><td class="small-txt">${col('pix')}</td>`; })()}<td>${soDigitos(c.documento).length===11?'':badgeSimples(simplesNaData(c,''))}</td><td class="num">${tot?fmtMoney(tot):'—'}</td>
         <td><button class="btn ghost small edit-only" onclick="credEditId='${c.id}';render();window.scrollTo(0,0)">✏️</button></td></tr>`; }).join('') || '<tr class="empty-row"><td colspan="9">Nenhum credor.</td></tr>'}</tbody></table></div>
     </div>`;
 }
@@ -3969,6 +4078,7 @@ function salvarCredor(){
   }
   const docAntes = soDigitos(c.documento);
   ['nome','documento','banco','agencia','conta','pix','obs'].forEach(k=>c[k] = valCampo('cr_'+k));
+  { const ex = cxLimpa(cxLer('cr')); if(ex.length || c.contasExtras) c.contasExtras = ex; }   /* 1.20: outras contas / PIX */
   c.documento = docDig ? fmtCNPJ(docDig) : '';
   if(valCampo('cr_retCodigo') && (c.retCodigo || valCampo('cr_retCodigo')!==RET_PADRAO)) c.retCodigo = valCampo('cr_retCodigo');
   if(docAntes && soDigitos(c.documento)!==docAntes){ delete c.simplesOptante; c.simplesConsultaEm = ''; } c.ativo = valCampo('cr_ativo')!=='0';
@@ -4265,7 +4375,7 @@ function exportarTudoExcel(){
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(STATE.recursos.map(r=>{ const c = calcRecurso(r); return { 'Exercício':r.exercicio, 'Área':r.area, 'Ficha':r.ficha, 'Recurso':recursoRotulo(r), 'Fonte':r.fonte, 'Saldo inicial':c.inicial, 'Entradas':c.entradas+c.ajustes, 'Ordenado':c.ordenado, 'Saldo':c.saldo, 'Empenhado':c.empenhado, 'Livre':c.livre }; })), 'Recursos');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(movPorTipo('empenho').map(e=>{ const k = calcEmpenho(e); return { 'Nº':e.numero, 'Data':e.data, 'Credor':e.credor, 'Valor':k.valor, 'Usado':k.usado, 'Saldo':k.saldo }; })), 'Empenhos');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(STATE.contratos.map(c=>{ const k = calcContrato(c); return { 'Número':c.numero, 'Tipo':c.tipo, 'Objeto':c.objeto, 'Credor':c.credor, 'Vigência':c.vigenciaFim, 'Valor':k.total, 'Ordenado':k.usado, 'Saldo':k.saldo }; })), 'Contratos');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(STATE.credores.map(c=>({ 'Credor':c.nome, 'CNPJ/CPF':fmtDocExib(c.documento), 'Banco':c.banco, 'Agência':c.agencia, 'Conta':c.conta, 'PIX':c.pix||'' }))), 'Credores');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(STATE.credores.map(c=>({ 'Credor':c.nome, 'CNPJ/CPF':fmtDocExib(c.documento), 'Banco':c.banco, 'Agência':c.agencia, 'Conta':c.conta, 'PIX':c.pix||'', 'Outras contas':cxLimpa(c.contasExtras).map(contaTexto).join(' | ') }))), 'Credores');
   XLSX.writeFile(wb, 'ordenamento_completo_'+hojeISO()+'.xlsx');
 }
 
